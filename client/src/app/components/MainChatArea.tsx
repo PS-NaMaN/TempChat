@@ -126,22 +126,7 @@ export function MainChatArea({
                   key={msg.id}
                   className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
                 >
-                  <div
-                    className="max-w-[70%] px-4 py-2.5 rounded-2xl"
-                    style={{
-                      backgroundColor: msg.sender === "me" ? "#6366f1" : "#222",
-                      borderBottomRightRadius: msg.sender === "me" ? "6px" : "16px",
-                      borderBottomLeftRadius: msg.sender === "other" ? "6px" : "16px",
-                    }}
-                  >
-                    <p className="text-white" style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.5 }}>{msg.text}</p>
-                    <p
-                      className={`mt-1 ${msg.sender === "me" ? "text-white/50" : "text-[#555]"}`}
-                      style={{ fontSize: "10px" }}
-                    >
-                      {msg.time}
-                    </p>
-                  </div>
+                  <MessageBubble msg={msg} />
                 </div>
               ))
             )}
@@ -179,6 +164,47 @@ export function MainChatArea({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MessageBubble({ msg }: { msg: Message }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = msg.text.length > 500;
+
+  const displayText = isLong && !expanded ? msg.text.slice(0, 500) + "..." : msg.text;
+
+  return (
+    <div
+      className="max-w-[70%] px-4 py-2.5 rounded-2xl flex flex-col"
+      style={{
+        backgroundColor: msg.sender === "me" ? "#6366f1" : "#222",
+        borderBottomRightRadius: msg.sender === "me" ? "6px" : "16px",
+        borderBottomLeftRadius: msg.sender === "other" ? "6px" : "16px",
+      }}
+    >
+      <p
+        className="text-white whitespace-pre-wrap break-words"
+        style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.5, wordBreak: "break-word", overflowWrap: "break-word" }}
+      >
+        {displayText}
+      </p>
+
+      {isLong && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className={`self-start mt-1 text-[11px] font-medium hover:underline ${msg.sender === "me" ? "text-white/80" : "text-[#777]"}`}
+        >
+          {expanded ? "Show less" : "Read more"}
+        </button>
+      )}
+
+      <p
+        className={`mt-1 text-right ${msg.sender === "me" ? "text-white/50" : "text-[#555]"}`}
+        style={{ fontSize: "10px" }}
+      >
+        {msg.time}
+      </p>
     </div>
   );
 }
