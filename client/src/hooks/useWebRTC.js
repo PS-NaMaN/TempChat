@@ -54,6 +54,14 @@ export function useWebRTC(roomId, password, onMessageDecrypted) {
                 if (payload.type === 'key-exchange') {
                     const remoteJwk = payload.jwk;
 
+                    // Await in case remote sent keys faster than our own WebCrypto generation
+                    let retries = 0;
+                    while (!keysRef.current && retries < 40) {
+                        await new Promise(r => setTimeout(r, 50));
+                        retries++;
+                    }
+                    if (!keysRef.current) throw new Error("Keys not ready after waiting");
+
                     const derivedKey = await deriveSharedKey(keysRef.current.keyPair.privateKey, remoteJwk);
                     setSharedKey(derivedKey);
 
@@ -111,57 +119,81 @@ export function useWebRTC(roomId, password, onMessageDecrypted) {
         socketRef.current.on('connect', () => {
             socketRef.current.emit('join_room', { roomId, password }, async (response) => {
                 if (response.error) {
-                    console.error(response.error);
-                    setConnectionStatus('disconnected');
-                    alert(response.error);
+                    console.error("WebRTC Error:", response.error);
+                    setConnectionStatus(response.error === 'Room not found' ? 'disconnected (expired)' : 'disconnected');
+                    if (response.error !== 'Room not found' && response.error !== 'Room is full') {
+                        alert(response.error);
+                    }
                     return;
                 }
 
-                const role = response.role;
+                const { role, usersCount } = response;
                 setRole(role);
 
                 if (role === 'answerer') {
+                    await initWebRTC(role);
+                } else if (role === 'offerer' && usersCount > 1) {
+                    // the offerer has rejoined a room where the answerer is already waiting
                     await initWebRTC(role);
                 }
             });
         });
 
+        let pendingCandidates = [];
+
         socketRef.current.on('peer_joined', async () => {
             const state = useChatStore.getState();
+            // Only the offerer should proactively reset and send a new offer when someone joins
             if (state.role === 'offerer') {
-                if (pcRef.current) pcRef.current.close(); // Reset PC on new join
+                if (pcRef.current) pcRef.current.close();
+                pendingCandidates = [];
                 await initWebRTC('offerer');
             }
+            // Answerers gracefully wait for the `webrtc_offer` event to arrive.
         });
 
         socketRef.current.on('webrtc_offer', async ({ sdp }) => {
-            if (!pcRef.current) {
-                // We might be answerer but PC not initialized yet?
-                await initWebRTC('answerer');
-            }
-            if (pcRef.current) {
-                await pcRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
-                const answer = await pcRef.current.createAnswer();
-                await pcRef.current.setLocalDescription(answer);
-                socketRef.current.emit('webrtc_answer', { roomId, sdp: answer });
+            // If an offer arrives, we clean up any old connection and start fresh to prevent race conditions
+            if (pcRef.current) pcRef.current.close();
+            pendingCandidates = [];
+
+            await initWebRTC('answerer');
+
+            await pcRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
+            const answer = await pcRef.current.createAnswer();
+            await pcRef.current.setLocalDescription(answer);
+            socketRef.current.emit('webrtc_answer', { roomId, sdp: answer });
+
+            // Process any ICE candidates that arrived early
+            while (pendingCandidates.length > 0) {
+                const c = pendingCandidates.shift();
+                pcRef.current.addIceCandidate(new RTCIceCandidate(c)).catch(e => console.error("ICE error", e));
             }
         });
 
         socketRef.current.on('webrtc_answer', async ({ sdp }) => {
             if (pcRef.current && pcRef.current.signalingState !== 'stable') {
                 await pcRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
+
+                while (pendingCandidates.length > 0) {
+                    const c = pendingCandidates.shift();
+                    pcRef.current.addIceCandidate(new RTCIceCandidate(c)).catch(e => console.error("ICE error", e));
+                }
             }
         });
 
         socketRef.current.on('ice_candidate', async ({ candidate }) => {
-            try {
-                if (pcRef.current) {
-                    await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-                }
-            } catch (e) {
-                console.error("Error adding ice candidate", e);
+            if (pcRef.current && pcRef.current.remoteDescription) {
+                pcRef.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error("ICE error", e));
+            } else {
+                pendingCandidates.push(candidate);
             }
         });
+
+        const handleBeforeUnload = () => {
+            if (socketRef.current) socketRef.current.disconnect();
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
 
         socketRef.current.on('peer_disconnected', () => {
             setConnectionStatus('peer_disconnected');
@@ -172,9 +204,15 @@ export function useWebRTC(roomId, password, onMessageDecrypted) {
         });
 
         return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
             if (dcRef.current) dcRef.current.close();
             if (pcRef.current) pcRef.current.close();
             if (socketRef.current) socketRef.current.disconnect();
+
+            dcRef.current = null;
+            pcRef.current = null;
+            socketRef.current = null;
+            keysRef.current = null;
         };
     }, [roomId, password, initWebRTC, setConnectionStatus, setRole, setSharedKey, setFingerprint]);
 

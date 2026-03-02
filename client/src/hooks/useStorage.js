@@ -80,6 +80,23 @@ const saveRecentRoom = async (roomData) => {
     try {
         const db = await initDB();
         await db.put(RECENT_ROOMS_STORE, roomData);
+
+        const allRooms = await db.getAll(RECENT_ROOMS_STORE);
+        if (allRooms.length > 10) {
+            allRooms.sort((a, b) => b.lastVisited - a.lastVisited);
+            for (let i = 10; i < allRooms.length; i++) {
+                const roomCode = allRooms[i].code;
+                await db.delete(RECENT_ROOMS_STORE, roomCode);
+                await db.delete(KEYS_STORE, roomCode);
+
+                const keys = await db.getAllKeysFromIndex(STORE_NAME, 'roomId', roomCode);
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                for (const key of keys) {
+                    tx.store.delete(key);
+                }
+                await tx.done;
+            }
+        }
     } catch (err) {
         console.error('Failed to save recent room', err);
     }

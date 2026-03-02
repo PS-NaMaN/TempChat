@@ -75,6 +75,13 @@ function Dashboard() {
 
                 const data = await res.json();
                 if (!res.ok) {
+                    const recentRoomsList = await getRecentRooms();
+                    const hasLocalRoom = recentRoomsList.some(r => r.code === roomId);
+                    if (hasLocalRoom) {
+                        setIsJoined(true);
+                        setNeedsPassword(false);
+                        return;
+                    }
                     alert(data.error || 'Room error');
                     navigate('/');
                     return;
@@ -166,7 +173,14 @@ function Dashboard() {
     }, [roomId, sharedKey]);
 
     const handleCreateRoom = async (code, pwd) => {
+        const currentRooms = await getRecentRooms();
+        if (currentRooms.length >= 10) {
+            const confirmed = window.confirm("You have reached the limit of 10 active rooms. Creating a new one will automatically delete your oldest room's history. Continue?");
+            if (!confirmed) return;
+        }
+
         setShowCreateModal(false);
+
         try {
             const API_URL = import.meta.env.VITE_SIGNALING_SERVER_URL || 'http://localhost:3001';
             const res = await fetch(`${API_URL}/api/rooms/create`, {

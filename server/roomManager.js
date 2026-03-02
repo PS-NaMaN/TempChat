@@ -55,8 +55,11 @@ class RoomManager {
 
         if (room.users.length >= 2) return null;
 
-        // First user is offerer, second is answerer
-        const role = room.users.length === 0 ? 'offerer' : 'answerer';
+        // Determine the missing role
+        let role = 'offerer';
+        if (room.users.length === 1) {
+            role = room.users[0].role === 'offerer' ? 'answerer' : 'offerer';
+        }
         room.users.push({ socketId, role });
 
         return role;
@@ -69,9 +72,9 @@ class RoomManager {
         room.users = room.users.filter(u => u.socketId !== socketId);
 
         // If empty, delete room immediately
-        if (room.users.length === 0) {
-            this.rooms.delete(roomId);
-        }
+        // if (room.users.length === 0) {
+        //     this.rooms.delete(roomId);
+        // }
     }
 
     removeUserGlobally(socketId) {
@@ -79,9 +82,9 @@ class RoomManager {
             const userIndex = room.users.findIndex(u => u.socketId === socketId);
             if (userIndex !== -1) {
                 room.users.splice(userIndex, 1);
-                if (room.users.length === 0) {
-                    this.rooms.delete(roomId);
-                }
+                // if (room.users.length === 0) {
+                //     this.rooms.delete(roomId);
+                // }
                 return roomId; // return the room id they were removed from
             }
         }

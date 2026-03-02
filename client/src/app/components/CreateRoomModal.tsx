@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Copy, Check } from "lucide-react";
 
@@ -18,10 +18,20 @@ function generateCode(): string {
 }
 
 export function CreateRoomModal({ isOpen, onClose, onCreateRoom }: CreateRoomModalProps) {
-  const [roomCode] = useState(generateCode);
+  const [roomCode, setRoomCode] = useState(generateCode());
   const [passwordProtect, setPasswordProtect] = useState(false);
   const [password, setPassword] = useState("");
   const [copied, setCopied] = useState(false);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setRoomCode(generateCode());
+      setPasswordProtect(false);
+      setPassword("");
+      setCopied(false);
+    }
+  }, [isOpen]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(roomCode);

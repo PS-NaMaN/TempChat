@@ -1,5 +1,6 @@
-import { Lock, Plus, LogIn, Settings } from "lucide-react";
+import { Lock, Plus, LogIn, Settings, Copy, Check } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useState } from "react";
 
 interface Room {
   code: string;
@@ -64,22 +65,12 @@ export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenS
         </span>
         <div className="mt-3 flex flex-col gap-1">
           {rooms.map((room) => (
-            <button
+            <SidebarRoomItem
               key={room.code}
-              onClick={() => onSelectRoom(room.code)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 cursor-pointer text-left ${activeRoomCode === room.code ? "bg-white/10" : "hover:bg-white/5"
-                }`}
-              style={{ backgroundColor: activeRoomCode === room.code ? "rgba(99,102,241,0.12)" : undefined }}
-            >
-              <span
-                className={`w-2 h-2 rounded-full flex-shrink-0 ${room.active ? "bg-emerald-400" : "bg-[#444]"}`}
-                style={room.active ? { boxShadow: "0 0 6px rgba(52, 211, 153, 0.5)" } : {}}
-              />
-              <span className="text-[#ccc] flex-1" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
-                {room.code}
-              </span>
-              {room.locked && <Lock className="w-3 h-3 text-[#555]" />}
-            </button>
+              room={room}
+              isActive={activeRoomCode === room.code}
+              onSelect={() => onSelectRoom(room.code)}
+            />
           ))}
         </div>
       </div>
@@ -98,5 +89,42 @@ export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenS
         <span className="text-[#444]" style={{ fontSize: "11px" }}>End-to-end encrypted</span>
       </div>
     </div>
+  );
+}
+
+function SidebarRoomItem({ room, isActive, onSelect }: { room: Room, isActive: boolean, onSelect: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation(); // prevent selecting the room
+    navigator.clipboard.writeText(room.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button
+      onClick={onSelect}
+      className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 cursor-pointer text-left ${isActive ? "bg-white/10" : "hover:bg-white/5"
+        }`}
+      style={{ backgroundColor: isActive ? "rgba(99,102,241,0.12)" : undefined }}
+    >
+      <span
+        className={`w-2 h-2 rounded-full flex-shrink-0 ${room.active ? "bg-emerald-400" : "bg-[#444]"}`}
+        style={room.active ? { boxShadow: "0 0 6px rgba(52, 211, 153, 0.5)" } : {}}
+      />
+      <span className="text-[#ccc] flex-1" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+        {room.code}
+      </span>
+      {room.locked && <Lock className="w-3 h-3 text-[#555] opacity-100 group-hover:hidden transition-opacity" />}
+
+      <div
+        onClick={handleCopy}
+        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[#888] hover:text-white"
+        title="Copy room link"
+      >
+        {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+      </div>
+    </button>
   );
 }

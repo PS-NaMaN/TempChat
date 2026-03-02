@@ -44,6 +44,11 @@ app.post('/api/rooms/check', async (req, res) => {
         return res.status(404).json({ error: 'Room not found' });
     }
 
+    // Proactively purge truly dead sockets before checking capacity
+    if (room.users) {
+        room.users = room.users.filter(u => io.sockets.sockets.has(u.socketId));
+    }
+
     if (roomManager.isRoomFull(roomId)) {
         return res.status(403).json({ error: 'Room is full' });
     }
@@ -62,6 +67,11 @@ io.on('connection', (socket) => {
         if (!room) {
             if (callback) callback({ error: 'Room not found' });
             return;
+        }
+
+        // Proactively purge truly dead sockets before checking capacity
+        if (room.users) {
+            room.users = room.users.filter(u => io.sockets.sockets.has(u.socketId));
         }
 
         if (roomManager.isRoomFull(roomId)) {
@@ -85,10 +95,13 @@ io.on('connection', (socket) => {
 
         socket.join(roomId);
 
+        const roomInfo = roomManager.getRoom(roomId);
+        const usersCount = roomInfo ? roomInfo.users.length : 1;
+
         // Notify the other peer if they exist
         socket.to(roomId).emit('peer_joined');
 
-        if (callback) callback({ success: true, role });
+        if (callback) callback({ success: true, role, usersCount });
     });
 
     socket.on('webrtc_offer', ({ sdp, roomId }) => {
