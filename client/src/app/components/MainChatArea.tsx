@@ -13,13 +13,24 @@ interface MainChatAreaProps {
   messages: Message[];
   onSendMessage: (text: string) => void;
   onClearChat: () => void;
+  onExportChat: () => void;
+  connectionStatus: string;
+  fingerprint: string | null;
 }
 
-export function MainChatArea({ activeRoomCode, messages, onSendMessage, onClearChat }: MainChatAreaProps) {
+export function MainChatArea({
+  activeRoomCode,
+  messages,
+  onSendMessage,
+  onClearChat,
+  onExportChat,
+  connectionStatus,
+  fingerprint
+}: MainChatAreaProps) {
   const [input, setInput] = useState("");
 
   const handleSend = () => {
-    if (input.trim() && activeRoomCode) {
+    if (input.trim() && activeRoomCode && connectionStatus === 'encrypted') {
       onSendMessage(input.trim());
       setInput("");
     }
@@ -36,36 +47,48 @@ export function MainChatArea({ activeRoomCode, messages, onSendMessage, onClearC
     <div className="flex-1 flex flex-col h-full" style={{ backgroundColor: "#161616", fontFamily: "Inter, sans-serif" }}>
       {/* Top Bar */}
       <div
-        className="flex items-center justify-between px-5 py-3"
+        className="flex justify-between px-5 py-3"
         style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-1">
           {activeRoomCode ? (
             <span className="text-[#888]" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
-              {activeRoomCode}
+              Room: {activeRoomCode}
             </span>
           ) : (
             <span className="text-[#444]" style={{ fontSize: "13px" }}>No room selected</span>
           )}
+          {fingerprint && (
+            <span className="text-[#555] opacity-80" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "10px" }}>
+              {fingerprint}
+            </span>
+          )}
         </div>
 
         {activeRoomCode && (
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${connectionStatus === 'encrypted' ? 'bg-emerald-400' : 'bg-yellow-400'}`} />
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${connectionStatus === 'encrypted' ? 'bg-emerald-400' : connectionStatus === 'peer_disconnected' ? 'bg-red-500' : 'bg-yellow-400'}`} />
               </span>
-              <span className="text-emerald-400" style={{ fontSize: "12px", fontWeight: 400 }}>Encrypted & Connected</span>
+              <span className={connectionStatus === 'encrypted' ? "text-emerald-400" : connectionStatus === 'peer_disconnected' ? "text-red-500" : "text-yellow-400"} style={{ fontSize: "12px", fontWeight: 400 }}>
+                {connectionStatus === 'disconnected' ? 'Disconnected' :
+                  connectionStatus === 'connecting' ? 'Connecting...' :
+                    connectionStatus === 'connected' ? 'Connected (Exchanging Keys)' :
+                      connectionStatus === 'encrypted' ? '🔒 Encrypted & Connected' :
+                        connectionStatus === 'peer_disconnected' ? 'Peer disconnected' : connectionStatus}
+              </span>
             </div>
 
-            <div className="flex items-center gap-1">
-              <button className="p-2 text-[#555] hover:text-white transition-colors cursor-pointer rounded-lg hover:bg-white/5">
+            <div className="flex items-center gap-1 mt-1">
+              <button onClick={onExportChat} className="p-2 text-[#555] hover:text-white transition-colors cursor-pointer rounded-lg hover:bg-white/5" title="Export Chat">
                 <Download className="w-4 h-4" />
               </button>
               <button
                 onClick={onClearChat}
                 className="p-2 text-[#555] hover:text-red-400 transition-colors cursor-pointer rounded-lg hover:bg-white/5"
+                title="Clear Chat History"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -129,9 +152,8 @@ export function MainChatArea({ activeRoomCode, messages, onSendMessage, onClearC
       {/* Message Input */}
       <div className="px-5 pb-5 pt-2">
         <div
-          className={`flex items-center gap-3 rounded-full px-4 py-2 transition-all ${
-            activeRoomCode ? "" : "opacity-40"
-          }`}
+          className={`flex items-center gap-3 rounded-full px-4 py-2 transition-all ${activeRoomCode ? "" : "opacity-40"
+            }`}
           style={{ backgroundColor: "#1e1e1e", border: "1px solid rgba(255,255,255,0.06)" }}
         >
           <Lock className="w-4 h-4 text-[#333] flex-shrink-0" />

@@ -1,4 +1,5 @@
 import { Lock, Plus, LogIn, Settings } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface Room {
   code: string;
@@ -11,16 +12,19 @@ interface SidebarProps {
   onCreateRoom: () => void;
   onJoinRoom: () => void;
   onSelectRoom: (code: string) => void;
+  onOpenSettings: () => void;
   activeRoomCode: string | null;
 }
 
-export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, activeRoomCode }: SidebarProps) {
+export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenSettings, activeRoomCode }: SidebarProps) {
   return (
     <div className="w-[260px] min-w-[260px] h-full flex flex-col" style={{ backgroundColor: "#0f0f0f", fontFamily: "Inter, sans-serif" }}>
       {/* Logo */}
-      <div className="flex items-center gap-2 px-5 pt-6 pb-4">
-        <Lock className="w-4 h-4 text-[#6366f1]" />
-        <span className="text-white tracking-widest" style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "0.15em" }}>CIPHER</span>
+      <div className="px-5 pt-6 pb-4">
+        <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Lock className="w-4 h-4 text-[#6366f1]" />
+          <span className="text-white tracking-widest" style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "0.15em" }}>CIPHER</span>
+        </Link>
       </div>
 
       {/* Buttons */}
@@ -63,9 +67,8 @@ export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, activeR
             <button
               key={room.code}
               onClick={() => onSelectRoom(room.code)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 cursor-pointer text-left ${
-                activeRoomCode === room.code ? "bg-white/10" : "hover:bg-white/5"
-              }`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 cursor-pointer text-left ${activeRoomCode === room.code ? "bg-white/10" : "hover:bg-white/5"
+                }`}
               style={{ backgroundColor: activeRoomCode === room.code ? "rgba(99,102,241,0.12)" : undefined }}
             >
               <span
@@ -84,6 +87,7 @@ export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, activeR
       {/* Footer */}
       <div className="px-4 pb-2 pt-1">
         <button
+          onClick={onOpenSettings}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#888] hover:text-white hover:bg-white/5 transition-all duration-150 cursor-pointer"
         >
           <Settings className="w-4 h-4" />
