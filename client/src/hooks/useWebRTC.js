@@ -120,7 +120,7 @@ export function useWebRTC(roomId, password, onMessageDecrypted) {
             socketRef.current.emit('join_room', { roomId, password }, async (response) => {
                 if (response.error) {
                     console.error("WebRTC Error:", response.error);
-                    setConnectionStatus(response.error === 'Room not found' ? 'disconnected (expired)' : 'disconnected');
+                    setConnectionStatus(response.error === 'Room not found' ? 'disconnected (expired)' : response.error === 'Room is full' ? 'room_full' : 'disconnected');
                     if (response.error !== 'Room not found' && response.error !== 'Room is full') {
                         alert(response.error);
                     }

@@ -69,15 +69,16 @@ export function MainChatArea({
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${connectionStatus === 'encrypted' ? 'bg-emerald-400' : 'bg-yellow-400'}`} />
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${connectionStatus === 'encrypted' ? 'bg-emerald-400' : connectionStatus === 'peer_disconnected' ? 'bg-red-500' : 'bg-yellow-400'}`} />
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${connectionStatus === 'encrypted' ? 'bg-emerald-400' : (connectionStatus === 'peer_disconnected' || connectionStatus === 'room_full') ? 'hidden' : 'bg-yellow-400'}`} />
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${connectionStatus === 'encrypted' ? 'bg-emerald-400' : (connectionStatus === 'peer_disconnected' || connectionStatus === 'room_full') ? 'bg-red-500' : 'bg-yellow-400'}`} />
               </span>
-              <span className={connectionStatus === 'encrypted' ? "text-emerald-400" : connectionStatus === 'peer_disconnected' ? "text-red-500" : "text-yellow-400"} style={{ fontSize: "12px", fontWeight: 400 }}>
+              <span className={connectionStatus === 'encrypted' ? "text-emerald-400" : (connectionStatus === 'peer_disconnected' || connectionStatus === 'room_full') ? "text-red-500" : "text-yellow-400"} style={{ fontSize: "12px", fontWeight: 400 }}>
                 {connectionStatus === 'disconnected' ? 'Disconnected' :
-                  connectionStatus === 'connecting' ? 'Connecting...' :
-                    connectionStatus === 'connected' ? 'Connected (Exchanging Keys)' :
-                      connectionStatus === 'encrypted' ? '🔒 Encrypted & Connected' :
-                        connectionStatus === 'peer_disconnected' ? 'Peer disconnected' : connectionStatus}
+                  connectionStatus === 'room_full' ? 'Room Full' :
+                    connectionStatus === 'connecting' ? 'Connecting...' :
+                      connectionStatus === 'connected' ? 'Connected (Exchanging Keys)' :
+                        connectionStatus === 'encrypted' ? '🔒 Encrypted & Connected' :
+                          connectionStatus === 'peer_disconnected' ? 'Peer disconnected' : connectionStatus}
               </span>
             </div>
 
