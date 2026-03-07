@@ -1,10 +1,11 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'TempChatDB';
-const DB_VERSION = 3; // Incremented for recentRooms store
+const DB_VERSION = 4; // Incremented for pendingMessages store
 const STORE_NAME = 'messages';
 const KEYS_STORE = 'roomKeys';
 const RECENT_ROOMS_STORE = 'recentRooms';
+const PENDING_STORE = 'pendingMessages';
 
 const initDB = async () => {
     return openDB(DB_NAME, DB_VERSION, {
@@ -18,6 +19,10 @@ const initDB = async () => {
             }
             if (!db.objectStoreNames.contains(RECENT_ROOMS_STORE)) {
                 db.createObjectStore(RECENT_ROOMS_STORE, { keyPath: 'code' });
+            }
+            if (!db.objectStoreNames.contains(PENDING_STORE)) {
+                const pStore = db.createObjectStore(PENDING_STORE, { keyPath: 'id' });
+                pStore.createIndex('roomId', 'roomId');
             }
         },
     });
@@ -119,8 +124,55 @@ const clearAllData = async () => {
         await db.clear(STORE_NAME);
         await db.clear(KEYS_STORE);
         await db.clear(RECENT_ROOMS_STORE);
+        await db.clear(PENDING_STORE);
     } catch (err) {
         console.error('Failed to clear all data', err);
+    }
+};
+
+// ---- Pending message queue helpers ----
+
+const savePendingMessage = async (msg) => {
+    // msg: { id, roomId, plainPayload, displayMsg }
+    try {
+        const db = await initDB();
+        await db.put(PENDING_STORE, msg);
+    } catch (err) {
+        console.error('Failed to save pending message', err);
+    }
+};
+
+const getPendingMessages = async (roomId) => {
+    try {
+        const db = await initDB();
+        const msgs = await db.getAllFromIndex(PENDING_STORE, 'roomId', roomId);
+        return msgs.sort((a, b) => Number(a.id) - Number(b.id));
+    } catch (err) {
+        console.error('Failed to get pending messages', err);
+        return [];
+    }
+};
+
+const deletePendingMessage = async (id) => {
+    try {
+        const db = await initDB();
+        await db.delete(PENDING_STORE, id);
+    } catch (err) {
+        console.error('Failed to delete pending message', err);
+    }
+};
+
+const clearPendingMessages = async (roomId) => {
+    try {
+        const db = await initDB();
+        const keys = await db.getAllKeysFromIndex(PENDING_STORE, 'roomId', roomId);
+        const tx = db.transaction(PENDING_STORE, 'readwrite');
+        for (const key of keys) {
+            tx.store.delete(key);
+        }
+        await tx.done;
+    } catch (err) {
+        console.error('Failed to clear pending messages', err);
     }
 };
 
@@ -129,6 +181,7 @@ export function useStorage() {
     return {
         saveRoomKey, getRoomKey,
         saveEncryptedMessage, getEncryptedMessages, clearMessages,
-        saveRecentRoom, getRecentRooms, clearAllData
+        saveRecentRoom, getRecentRooms, clearAllData,
+        savePendingMessage, getPendingMessages, deletePendingMessage, clearPendingMessages
     };
 }

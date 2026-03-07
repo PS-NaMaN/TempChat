@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Lock, Shield, Send, Download, Trash2 } from "lucide-react";
+import { Lock, Shield, Send, Download, Trash2, Clock } from "lucide-react";
 
 interface Message {
   id: string;
   text: string;
   sender: "me" | "other";
   time: string;
+  pending?: boolean;
 }
 
 interface MainChatAreaProps {
@@ -30,7 +31,7 @@ export function MainChatArea({
   const [input, setInput] = useState("");
 
   const handleSend = () => {
-    if (input.trim() && activeRoomCode && connectionStatus === 'encrypted') {
+    if (input.trim() && activeRoomCode) {
       onSendMessage(input.trim());
       setInput("");
     }
@@ -200,12 +201,22 @@ function MessageBubble({ msg }: { msg: Message }) {
         </button>
       )}
 
-      <p
-        className={`mt-1 text-right ${msg.sender === "me" ? "text-white/50" : "text-[var(--text-faint)]"}`}
-        style={{ fontSize: "10px" }}
+      <div
+        className={`mt-1 flex items-center gap-1 ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
       >
-        {msg.time}
-      </p>
+        {msg.pending && (
+          <span className="flex items-center gap-0.5 text-white/40">
+            <Clock className="w-3 h-3" />
+            <span style={{ fontSize: "9px" }}>Queued</span>
+          </span>
+        )}
+        <p
+          className={`${msg.sender === "me" ? "text-white/50" : "text-[var(--text-faint)]"}`}
+          style={{ fontSize: "10px" }}
+        >
+          {msg.time}
+        </p>
+      </div>
     </div>
   );
 }

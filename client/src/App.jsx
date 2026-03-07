@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Routes, Route, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './app/components/Sidebar';
 import { CreateRoomModal } from './app/components/CreateRoomModal';
@@ -46,8 +46,11 @@ function Dashboard() {
 
     const {
         saveEncryptedMessage, getEncryptedMessages, clearMessages,
-        saveRoomKey, getRoomKey, saveRecentRoom, getRecentRooms
+        saveRoomKey, getRoomKey, saveRecentRoom, getRecentRooms,
+        savePendingMessage, getPendingMessages, deletePendingMessage
     } = useStorage();
+
+    const flushingRef = useRef(false);
 
     const reloadRecentRooms = useCallback(async () => {
         const list = await getRecentRooms();
@@ -154,36 +157,96 @@ function Dashboard() {
                 await saveRoomKey(roomId, sharedKey);
             }
             const savedKey = sharedKey || await getRoomKey(roomId);
-            if (!savedKey) return;
 
-            const encryptedMsgs = await getEncryptedMessages(roomId);
-            if (encryptedMsgs.length > 0) {
-                try {
-                    const { decryptMessage } = await import('./hooks/useCrypto').then(m => m.useCrypto());
-                    const decryptedMsgs = [];
-                    for (const msg of encryptedMsgs) {
-                        try {
-                            const text = await decryptMessage(savedKey, msg.iv, msg.ciphertext);
-                            const parsed = JSON.parse(text);
-                            decryptedMsgs.push({
-                                id: parsed.id,
-                                text: parsed.text,
-                                sender: msg.sender || parsed.sender || 'me',
-                                time: parsed.time
-                            });
-                        } catch (e) {
-                            console.error("Could not decrypt history msg", e);
+            let restoredMsgs = [];
+
+            // Restore encrypted (already-sent) messages
+            if (savedKey) {
+                const encryptedMsgs = await getEncryptedMessages(roomId);
+                if (encryptedMsgs.length > 0) {
+                    try {
+                        const { decryptMessage } = await import('./hooks/useCrypto').then(m => m.useCrypto());
+                        for (const msg of encryptedMsgs) {
+                            try {
+                                const text = await decryptMessage(savedKey, msg.iv, msg.ciphertext);
+                                const parsed = JSON.parse(text);
+                                restoredMsgs.push({
+                                    id: parsed.id,
+                                    text: parsed.text,
+                                    sender: msg.sender || parsed.sender || 'me',
+                                    time: parsed.time
+                                });
+                            } catch (e) {
+                                console.error("Could not decrypt history msg", e);
+                            }
                         }
+                    } catch (e) {
+                        console.error("Failed to load messages", e);
                     }
-                    setMessages(decryptedMsgs);
-                } catch (e) {
-                    console.error("Failed to load messages", e);
                 }
+            }
+
+            // Restore pending (queued, unsent) messages
+            const pending = await getPendingMessages(roomId);
+            for (const item of pending) {
+                restoredMsgs.push({ ...item.displayMsg, pending: true });
+            }
+
+            if (restoredMsgs.length > 0) {
+                setMessages(restoredMsgs);
             }
         };
         handleStorage();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [roomId, sharedKey]);
+
+    // Flush pending message queue when connection becomes encrypted
+    useEffect(() => {
+        if (connectionStatus !== 'encrypted' || !roomId || flushingRef.current) return;
+
+        const flushQueue = async () => {
+            const pending = await getPendingMessages(roomId);
+            if (pending.length === 0) return;
+
+            flushingRef.current = true;
+            console.log(`[Queue] Flushing ${pending.length} pending message(s)...`);
+
+            for (const item of pending) {
+                // Check if connection is still encrypted before each send
+                const currentStatus = useChatStore.getState().connectionStatus;
+                if (currentStatus !== 'encrypted') {
+                    console.log('[Queue] Connection lost mid-flush, stopping.');
+                    break;
+                }
+
+                try {
+                    const encResult = await sendMessage(item.plainPayload);
+                    if (encResult) {
+                        await saveEncryptedMessage({
+                            id: item.id,
+                            roomId,
+                            iv: encResult.iv,
+                            ciphertext: encResult.ciphertext,
+                            sender: 'me'
+                        });
+                        await deletePendingMessage(item.id);
+                        // Update UI to remove 'Queued' tag
+                        useChatStore.getState().markMessageSent(item.id);
+                        console.log(`[Queue] Sent queued message ${item.id}`);
+                    }
+                } catch (e) {
+                    console.error('[Queue] Failed to send queued message', item.id, e);
+                }
+
+                // Rate-limit: wait 200ms between each send
+                await new Promise(r => setTimeout(r, 200));
+            }
+
+            flushingRef.current = false;
+        };
+
+        flushQueue();
+    }, [connectionStatus, roomId, sendMessage, getPendingMessages, deletePendingMessage, saveEncryptedMessage]);
 
     const handleCreateRoom = async (code, pwd) => {
         const currentRooms = await getRecentRooms();
@@ -236,16 +299,27 @@ function Dashboard() {
             sender: 'me',
             time: timeStr
         });
-        const encResult = await sendMessage(plainPayload);
-        if (encResult) {
-            const newMsg = {
-                id: timestamp.toString(),
-                text,
-                sender: 'me',
-                time: timeStr
-            };
+
+        const currentStatus = useChatStore.getState().connectionStatus;
+
+        if (currentStatus === 'encrypted') {
+            // Connection is live — send immediately
+            const encResult = await sendMessage(plainPayload);
+            if (encResult) {
+                const newMsg = { id: timestamp.toString(), text, sender: 'me', time: timeStr };
+                addMessage(newMsg);
+                saveEncryptedMessage({ id: timestamp.toString(), roomId, iv: encResult.iv, ciphertext: encResult.ciphertext, sender: 'me' });
+            }
+        } else {
+            // No peer yet — queue the message in IndexedDB and show it in the UI
+            const newMsg = { id: timestamp.toString(), text, sender: 'me', time: timeStr, pending: true };
             addMessage(newMsg);
-            saveEncryptedMessage({ id: timestamp.toString(), roomId, iv: encResult.iv, ciphertext: encResult.ciphertext, sender: 'me' });
+            await savePendingMessage({
+                id: timestamp.toString(),
+                roomId,
+                plainPayload,
+                displayMsg: newMsg
+            });
         }
     };
 

@@ -16,4 +16,7 @@ export const useChatStore = create((set) => ({
     setFingerprint: (fingerprint) => set({ fingerprint }),
     setSharedKey: (sharedKey) => set({ sharedKey }),
     clearChat: () => set({ messages: [] }),
+    markMessageSent: (id) => set((state) => ({
+        messages: state.messages.map(m => m.id === id ? { ...m, pending: false } : m)
+    })),
 }));
