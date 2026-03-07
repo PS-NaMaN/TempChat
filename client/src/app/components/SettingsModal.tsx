@@ -1,14 +1,27 @@
 import { motion, AnimatePresence } from "motion/react";
-import { X, Trash2, AlertTriangle } from "lucide-react";
+import { X, Trash2, AlertTriangle, Palette, Moon, Sun, Monitor } from "lucide-react";
 import { useStorage } from "../../hooks/useStorage";
 import { useNavigate } from "react-router-dom";
 
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
+    theme: string;
+    setTheme: (theme: string) => void;
+    accent: string;
+    setAccent: (accent: string) => void;
 }
 
-export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+const PRESET_ACCENTS = [
+    "#6366f1", // Indigo (default)
+    "#ec4899", // Pink
+    "#10b981", // Emerald
+    "#f59e0b", // Amber
+    "#3b82f6", // Blue
+    "#8b5cf6", // Violet
+];
+
+export function SettingsModal({ isOpen, onClose, theme, setTheme, accent, setAccent }: SettingsModalProps) {
     const { clearAllData } = useStorage();
     const navigate = useNavigate();
 
@@ -38,10 +51,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     />
 
                     <motion.div
-                        className="relative z-10 w-full max-w-sm rounded-2xl p-6"
+                        className="relative z-10 w-full max-w-sm rounded-2xl p-6 flex flex-col gap-6"
                         style={{
-                            backgroundColor: "#1a1a1a",
-                            border: "1px solid rgba(255,255,255,0.06)",
+                            backgroundColor: "var(--bg-panel)",
+                            border: "1px solid var(--border-light)",
                             boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
                             fontFamily: "Inter, sans-serif",
                         }}
@@ -52,23 +65,92 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     >
                         <button
                             onClick={onClose}
-                            className="absolute top-4 right-4 text-[#555] hover:text-white transition-colors cursor-pointer"
+                            className="absolute top-4 right-4 text-[var(--icon-muted)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
                         >
                             <X className="w-5 h-5" />
                         </button>
 
-                        <h2 className="text-white mb-6" style={{ fontSize: "18px", fontWeight: 600 }}>Settings</h2>
+                        <h2 className="text-[var(--text-main)]" style={{ fontSize: "18px", fontWeight: 600 }}>Settings</h2>
 
-                        <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-5">
+                            {/* Theme Options */}
+                            <div className="flex flex-col gap-3">
+                                <span className="text-[var(--text-secondary)] uppercase tracking-wider" style={{ fontSize: "10px", fontWeight: 600 }}>
+                                    Appearance
+                                </span>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button
+                                        onClick={() => setTheme("slate")}
+                                        className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all ${theme === "slate"
+                                            ? "border-[var(--accent)] bg-[var(--accent-transparent-1)] text-[var(--accent)]"
+                                            : "border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--hover-bg)]"
+                                            }`}
+                                    >
+                                        <Monitor className="w-4 h-4" />
+                                        <span style={{ fontSize: "11px", fontWeight: 500 }}>Slate</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setTheme("amoled")}
+                                        className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all ${theme === "amoled"
+                                            ? "border-[var(--accent)] bg-[var(--accent-transparent-1)] text-[var(--accent)]"
+                                            : "border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--hover-bg)]"
+                                            }`}
+                                    >
+                                        <Moon className="w-4 h-4" />
+                                        <span style={{ fontSize: "11px", fontWeight: 500 }}>AMOLED</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setTheme("light")}
+                                        className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all ${theme === "light"
+                                            ? "border-[var(--accent)] bg-[var(--accent-transparent-1)] text-[var(--accent)]"
+                                            : "border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--hover-bg)]"
+                                            }`}
+                                    >
+                                        <Sun className="w-4 h-4" />
+                                        <span style={{ fontSize: "11px", fontWeight: 500 }}>Light</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Accent Color Options */}
+                            <div className="flex flex-col gap-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[var(--text-secondary)] uppercase tracking-wider" style={{ fontSize: "10px", fontWeight: 600 }}>
+                                        Accent Color
+                                    </span>
+                                </div>
+                                <div className="flex gap-2 items-center flex-wrap">
+                                    {PRESET_ACCENTS.map((color) => (
+                                        <button
+                                            key={color}
+                                            onClick={() => setAccent(color)}
+                                            className="w-6 h-6 rounded-full cursor-pointer transition-transform hover:scale-110 flex items-center justify-center border-2 border-[var(--bg-panel)]"
+                                            style={{ backgroundColor: color, outline: accent === color ? `2px solid ${color}` : "none" }}
+                                        />
+                                    ))}
+                                    <div className="w-[1px] h-4 bg-[var(--border-light)] mx-1" />
+                                    <div className="relative w-6 h-6 rounded-full overflow-hidden border-2 border-[var(--bg-panel)] flex-shrink-0 cursor-pointer" style={{ outline: !PRESET_ACCENTS.includes(accent) ? `2px solid ${accent}` : "none", backgroundColor: accent }}>
+                                        <Palette className="w-3 h-3 text-white mix-blend-difference absolute inset-0 m-auto pointer-events-none opacity-50" />
+                                        <input
+                                            type="color"
+                                            value={accent}
+                                            onChange={(e) => setAccent(e.target.value)}
+                                            className="absolute inset-[-10px] w-10 h-10 opacity-0 cursor-pointer"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Danger Zone */}
                             <div
-                                className="p-4 rounded-xl flex flex-col gap-3"
-                                style={{ backgroundColor: "rgba(239, 68, 68, 0.05)", border: "1px solid rgba(239, 68, 68, 0.2)" }}
+                                className="p-4 rounded-xl flex flex-col gap-3 mt-2"
+                                style={{ backgroundColor: "var(--danger-bg)", border: "1px solid var(--danger-border)" }}
                             >
                                 <div className="flex gap-3">
                                     <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
                                     <div>
                                         <h3 className="text-red-500 font-medium text-sm mb-1">Danger Zone</h3>
-                                        <p className="text-[#888] text-xs leading-relaxed">
+                                        <p className="text-[var(--text-muted)] text-xs leading-relaxed">
                                             Delete everything stored locally in your browser. This action cannot be reversed, and all histories and keys will be lost permanently.
                                         </p>
                                     </div>
@@ -76,9 +158,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
                                 <button
                                     onClick={handleClearAllData}
-                                    className="w-full flex items-center justify-center gap-2 py-2.5 mt-2 rounded-lg text-white transition-all duration-200 cursor-pointer hover:brightness-110"
+                                    className="w-full flex items-center justify-center gap-2 py-2.5 mt-2 rounded-lg text-white transition-all duration-200 cursor-pointer hover:brightness-110 bg-red-500"
                                     style={{
-                                        backgroundColor: "#ef4444",
                                         fontSize: "13px",
                                         fontWeight: 500,
                                     }}

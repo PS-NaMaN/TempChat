@@ -3,7 +3,8 @@ import { Sidebar } from "./components/Sidebar";
 import { CreateRoomModal } from "./components/CreateRoomModal";
 import { JoinRoomModal } from "./components/JoinRoomModal";
 import { MainChatArea } from "./components/MainChatArea";
-
+import { SettingsModal } from "./components/SettingsModal";
+import { useEffect } from "react";
 interface Room {
   code: string;
   active: boolean;
@@ -42,7 +43,21 @@ export default function App() {
   const [activeRoomCode, setActiveRoomCode] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [messagesByRoom, setMessagesByRoom] = useState<Record<string, Message[]>>({});
+
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'slate');
+  const [accent, setAccent] = useState(() => localStorage.getItem('accent') || '#6366f1');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--accent', accent);
+    localStorage.setItem('accent', accent);
+  }, [accent]);
 
   const currentMessages = activeRoomCode ? messagesByRoom[activeRoomCode] || [] : [];
 
@@ -105,6 +120,7 @@ export default function App() {
         onCreateRoom={() => setShowCreateModal(true)}
         onJoinRoom={() => setShowJoinModal(true)}
         onSelectRoom={handleSelectRoom}
+        onOpenSettings={() => setShowSettingsModal(true)}
         activeRoomCode={activeRoomCode}
       />
       <MainChatArea
@@ -112,6 +128,9 @@ export default function App() {
         messages={currentMessages}
         onSendMessage={handleSendMessage}
         onClearChat={handleClearChat}
+        onExportChat={() => { }}
+        connectionStatus="encrypted"
+        fingerprint={null}
       />
       <CreateRoomModal
         isOpen={showCreateModal}
@@ -122,6 +141,14 @@ export default function App() {
         isOpen={showJoinModal}
         onClose={() => setShowJoinModal(false)}
         onJoinRoom={handleJoinRoom}
+      />
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        theme={theme}
+        setTheme={setTheme}
+        accent={accent}
+        setAccent={setAccent}
       />
     </div>
   );

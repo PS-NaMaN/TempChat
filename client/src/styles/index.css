@@ -2,11 +2,100 @@
 @import './tailwind.css';
 @import './theme.css';
 
+:root {
+  /* Default Theme: Slate */
+  --bg-main: #0f0f0f;
+  --bg-panel: #1a1a1a;
+  --bg-input: #111111;
+  --bg-sidebar: #0f0f0f;
+  --bg-chat: #161616;
+  --bg-chat-bubble-me-text: #ffffff;
+  --bg-chat-bubble-other: #222222;
+  --bg-chat-bubble-other-text: #ffffff;
+  --border-light: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.08);
+  --text-main: #ffffff;
+  --text-primary: #cccccc;
+  --text-secondary: #888888;
+  --text-muted: #666666;
+  --text-faint: #555555;
+  --text-dark: #444444;
+  --text-darker: #333333;
+  --hover-bg: rgba(255, 255, 255, 0.05);
+  --hover-bg-strong: rgba(255, 255, 255, 0.1);
+  --icon-muted: #555555;
+  --icon-light: #555555;
+  --danger-bg: rgba(239, 68, 68, 0.05);
+  --danger-border: rgba(239, 68, 68, 0.2);
 
-html, body, #root {
+  /* Accent Color */
+  --accent: #6366f1;
+  --accent-transparent-1: color-mix(in srgb, var(--accent) 6%, transparent);
+  --accent-transparent-2: color-mix(in srgb, var(--accent) 12%, transparent);
+  --accent-transparent-3: color-mix(in srgb, var(--accent) 25%, transparent);
+  --accent-transparent-4: color-mix(in srgb, var(--accent) 30%, transparent);
+  --accent-hover: color-mix(in srgb, var(--accent) 80%, black);
+}
+
+[data-theme='amoled'] {
+  --bg-main: #000000;
+  --bg-panel: #050505;
+  --bg-input: #000000;
+  --bg-sidebar: #000000;
+  --bg-chat: #020202;
+  --bg-chat-bubble-other: #0a0a0a;
+  --bg-chat-bubble-me-text: #ffffff;
+  --bg-chat-bubble-other-text: #ffffff;
+  --border-light: rgba(255, 255, 255, 0.1);
+  --border-medium: rgba(255, 255, 255, 0.15);
+  --text-main: #ffffff;
+  --text-primary: #dddddd;
+  --text-secondary: #aaaaaa;
+  --text-muted: #888888;
+  --text-faint: #666666;
+  --text-dark: #555555;
+  --text-darker: #444444;
+  --hover-bg: rgba(255, 255, 255, 0.08);
+  --hover-bg-strong: rgba(255, 255, 255, 0.15);
+  --icon-muted: #666666;
+  --icon-light: #777777;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --danger-border: rgba(239, 68, 68, 0.3);
+}
+
+[data-theme='light'] {
+  --bg-main: #f3f4f6;
+  --bg-panel: #ffffff;
+  --bg-input: #f9fafb;
+  --bg-sidebar: #ffffff;
+  --bg-chat: #f3f4f6;
+  --bg-chat-bubble-other: #e5e7eb;
+  --bg-chat-bubble-me-text: #ffffff;
+  --bg-chat-bubble-other-text: #111827;
+  --border-light: rgba(0, 0, 0, 0.1);
+  --border-medium: rgba(0, 0, 0, 0.15);
+  --text-main: #111827;
+  --text-primary: #374151;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+  --text-dark: #d1d5db;
+  --text-darker: #e5e7eb;
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  --hover-bg-strong: rgba(0, 0, 0, 0.1);
+  --icon-muted: #9ca3af;
+  --icon-light: #6b7280;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --danger-border: rgba(239, 68, 68, 0.3);
+}
+
+html,
+body,
+#root {
   height: 100%;
   min-height: 100vh;
-  background-color: #0f0f0f;
+  background-color: var(--bg-main);
+  color: var(--text-main);
   margin: 0;
   padding: 0;
 }

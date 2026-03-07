@@ -20,6 +20,19 @@ function Dashboard() {
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
 
+    const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'slate');
+    const [accent, setAccent] = useState(() => localStorage.getItem('accent') || '#6366f1');
+
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+
+    useEffect(() => {
+        document.documentElement.style.setProperty('--accent', accent);
+        localStorage.setItem('accent', accent);
+    }, [accent]);
+
     const [password, setPassword] = useState(location.state?.password || '');
     const [passwordInput, setPasswordInput] = useState('');
     const [needsPassword, setNeedsPassword] = useState(false);
@@ -260,27 +273,27 @@ function Dashboard() {
 
     if (loadingRoom) {
         RightContent = (
-            <div className="flex-1 flex flex-col items-center justify-center w-full" style={{ backgroundColor: "#161616" }}>
-                <span className="w-8 h-8 border-4 border-[#333] border-t-[#6366f1] rounded-full animate-spin"></span>
+            <div className="flex-1 flex flex-col items-center justify-center w-full transition-colors duration-200" style={{ backgroundColor: "var(--bg-chat)" }}>
+                <span className="w-8 h-8 border-4 border-t-transparent border-[var(--accent)] opacity-80 rounded-full animate-spin"></span>
             </div>
         )
     } else if (needsPassword) {
         RightContent = (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-white w-full h-full" style={{ backgroundColor: "#161616" }}>
-                <form onSubmit={handleAuth} className="w-full max-w-md bg-[#111] border border-white/5 rounded-2xl p-6 shadow-2xl flex flex-col gap-5">
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-[var(--text-main)] w-full h-full transition-colors duration-200" style={{ backgroundColor: "var(--bg-chat)" }}>
+                <form onSubmit={handleAuth} className="w-full max-w-md border rounded-2xl p-6 shadow-2xl flex flex-col gap-5 transition-colors duration-200" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border-light)" }}>
                     <div className="flex flex-col items-center gap-3 mb-2">
-                        <Lock className="w-8 h-8 text-[#6366f1]" />
+                        <Lock className="w-8 h-8 text-[var(--accent)]" />
                         <h2 className="text-xl font-semibold">Enter Password</h2>
-                        <p className="text-[#888] text-sm text-center">This room is password protected.</p>
+                        <p className="text-[var(--text-secondary)] text-sm text-center">This room is password protected.</p>
                     </div>
-                    <div className="flex items-center gap-3 bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 focus-within:border-[#6366f1]/50">
-                        <Lock className="w-4 h-4 text-[#555]" />
+                    <div className="flex items-center gap-3 border rounded-xl px-4 py-3 focus-within:border-[var(--accent)] transition-all" style={{ backgroundColor: "var(--bg-panel)", borderColor: "var(--border-light)" }}>
+                        <Lock className="w-4 h-4 text-[var(--icon-muted)]" />
                         <input
                             type="password"
                             value={passwordInput}
                             onChange={(e) => setPasswordInput(e.target.value)}
                             placeholder="Room Password"
-                            className="flex-1 bg-transparent text-white outline-none placeholder-[#444] text-[14px]"
+                            className="flex-1 bg-transparent text-[var(--text-main)] outline-none placeholder-[var(--text-dark)] text-[14px]"
                             autoFocus
                         />
                     </div>
@@ -288,7 +301,7 @@ function Dashboard() {
                         type="submit"
                         disabled={!passwordInput.trim()}
                         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white transition-all duration-200 cursor-pointer hover:brightness-110 disabled:opacity-50"
-                        style={{ backgroundColor: "#6366f1" }}
+                        style={{ backgroundColor: "var(--accent)" }}
                     >
                         <LogIn className="w-4 h-4" />
                         Unlock Room
@@ -311,7 +324,7 @@ function Dashboard() {
     }
 
     return (
-        <div className="h-full w-full flex bg-black text-white" style={{ fontFamily: "Inter, sans-serif" }}>
+        <div className="h-full w-full flex transition-colors duration-200" style={{ fontFamily: "Inter, sans-serif", backgroundColor: "var(--bg-main)", color: "var(--text-main)" }}>
             <Sidebar
                 rooms={rooms}
                 onCreateRoom={() => setShowCreateModal(true)}
@@ -338,6 +351,10 @@ function Dashboard() {
             <SettingsModal
                 isOpen={showSettingsModal}
                 onClose={() => setShowSettingsModal(false)}
+                theme={theme}
+                setTheme={setTheme}
+                accent={accent}
+                setAccent={setAccent}
             />
         </div>
     );

@@ -38,8 +38,8 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom }: JoinRoomModalProp
           <motion.div
             className="relative z-10 w-full max-w-md mx-4 rounded-2xl p-6"
             style={{
-              backgroundColor: "#1a1a1a",
-              border: "1px solid rgba(255,255,255,0.06)",
+              backgroundColor: "var(--bg-panel)",
+              border: "1px solid var(--border-light)",
               boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
               fontFamily: "Inter, sans-serif",
             }}
@@ -50,13 +50,13 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom }: JoinRoomModalProp
           >
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 text-[#555] hover:text-white transition-colors cursor-pointer"
+              className="absolute top-4 right-4 text-[var(--icon-muted)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h2 className="text-white mb-1" style={{ fontSize: "18px", fontWeight: 600 }}>Join a Room</h2>
-            <p className="text-[#666] mb-6" style={{ fontSize: "13px", fontWeight: 400 }}>
+            <h2 className="text-[var(--text-main)] mb-1" style={{ fontSize: "18px", fontWeight: 600 }}>Join a Room</h2>
+            <p className="text-[var(--text-muted)] mb-6" style={{ fontSize: "13px", fontWeight: 400 }}>
               Enter the room code to connect
             </p>
 
@@ -65,10 +65,10 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom }: JoinRoomModalProp
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="Enter room code..."
-              className="w-full px-4 py-3 rounded-xl text-white placeholder-[#555] mb-3 outline-none focus:ring-1 focus:ring-[#6366f1] transition-all"
+              className="w-full px-4 py-3 rounded-xl text-[var(--text-main)] placeholder-[var(--text-faint)] mb-3 outline-none transition-all"
               style={{
-                backgroundColor: "#111",
-                border: "1px solid rgba(255,255,255,0.08)",
+                backgroundColor: "var(--bg-input)",
+                border: "1px solid var(--border-medium)",
                 fontFamily: "JetBrains Mono, monospace",
                 fontSize: "14px",
               }}
@@ -79,13 +79,12 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom }: JoinRoomModalProp
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password (if required)"
-              className={`w-full px-4 py-3 rounded-xl placeholder-[#555] mb-2 outline-none focus:ring-1 focus:ring-[#6366f1] transition-all ${
-                code.trim() ? "text-white" : "text-[#333] opacity-50"
-              }`}
+              className={`w-full px-4 py-3 rounded-xl placeholder-[var(--text-faint)] mb-2 outline-none transition-all ${code.trim() ? "text-[var(--text-main)]" : "text-[var(--text-darker)] opacity-50"
+                }`}
               disabled={!code.trim()}
               style={{
-                backgroundColor: "#111",
-                border: "1px solid rgba(255,255,255,0.08)",
+                backgroundColor: "var(--bg-input)",
+                border: "1px solid var(--border-medium)",
                 fontFamily: "Inter, sans-serif",
                 fontSize: "13px",
               }}
@@ -97,8 +96,8 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom }: JoinRoomModalProp
                 disabled={!code.trim()}
                 className="w-full py-3 rounded-xl text-white transition-all duration-200 cursor-pointer hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: "#6366f1",
-                  boxShadow: code.trim() ? "0 0 20px rgba(99, 102, 241, 0.25)" : "none",
+                  backgroundColor: "var(--accent)",
+                  boxShadow: code.trim() ? "0 0 20px var(--accent-transparent-3)" : "none",
                   fontSize: "14px",
                   fontWeight: 500,
                 }}
@@ -107,7 +106,7 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom }: JoinRoomModalProp
               </button>
             </div>
 
-            <p className="text-center text-[#444] mt-4" style={{ fontSize: "11px" }}>
+            <p className="text-center text-[var(--text-dark)] mt-4" style={{ fontSize: "11px" }}>
               Room codes are case-sensitive
             </p>
           </motion.div>

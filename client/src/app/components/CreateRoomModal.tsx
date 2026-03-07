@@ -65,8 +65,8 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom }: CreateRoomMod
           <motion.div
             className="relative z-10 w-full max-w-md mx-4 rounded-2xl p-6"
             style={{
-              backgroundColor: "#1a1a1a",
-              border: "1px solid rgba(255,255,255,0.06)",
+              backgroundColor: "var(--bg-panel)",
+              border: "1px solid var(--border-light)",
               boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
               fontFamily: "Inter, sans-serif",
             }}
@@ -77,27 +77,27 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom }: CreateRoomMod
           >
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 text-[#555] hover:text-white transition-colors cursor-pointer"
+              className="absolute top-4 right-4 text-[var(--icon-muted)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h2 className="text-white mb-1" style={{ fontSize: "18px", fontWeight: 600 }}>Create a New Room</h2>
-            <p className="text-[#666] mb-6" style={{ fontSize: "13px", fontWeight: 400 }}>
+            <h2 className="text-[var(--text-main)] mb-1" style={{ fontSize: "18px", fontWeight: 600 }}>Create a New Room</h2>
+            <p className="text-[var(--text-muted)] mb-6" style={{ fontSize: "13px", fontWeight: 400 }}>
               Share the room code with someone to start chatting
             </p>
 
             {/* Room Code Display */}
             <div
               className="flex items-center justify-between px-4 py-3.5 rounded-xl mb-5"
-              style={{ backgroundColor: "#111", border: "1px solid rgba(255,255,255,0.08)" }}
+              style={{ backgroundColor: "var(--bg-input)", border: "1px solid var(--border-medium)" }}
             >
-              <span className="text-white" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "20px", fontWeight: 500, letterSpacing: "0.08em" }}>
+              <span className="text-[var(--text-main)]" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "20px", fontWeight: 500, letterSpacing: "0.08em" }}>
                 {roomCode}
               </span>
               <button
                 onClick={handleCopy}
-                className="text-[#666] hover:text-[#6366f1] transition-colors cursor-pointer p-1"
+                className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors cursor-pointer p-1"
               >
                 {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
               </button>
@@ -105,11 +105,11 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom }: CreateRoomMod
 
             {/* Password Toggle */}
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[#aaa]" style={{ fontSize: "13px", fontWeight: 400 }}>Password Protect this Room</span>
+              <span className="text-[var(--text-secondary)]" style={{ fontSize: "13px", fontWeight: 400 }}>Password Protect this Room</span>
               <button
                 onClick={() => setPasswordProtect(!passwordProtect)}
                 className={`relative w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer`}
-                style={{ backgroundColor: passwordProtect ? "#6366f1" : "#333" }}
+                style={{ backgroundColor: passwordProtect ? "var(--accent)" : "var(--text-darker)" }}
               >
                 <motion.div
                   className="absolute top-0.5 w-5 h-5 rounded-full bg-white"
@@ -134,10 +134,10 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom }: CreateRoomMod
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Set a password..."
-                    className="w-full px-4 py-3 rounded-xl text-white placeholder-[#555] mb-4 outline-none focus:ring-1 focus:ring-[#6366f1] transition-all"
+                    className="w-full px-4 py-3 rounded-xl text-[var(--text-main)] placeholder-[var(--text-faint)] mb-4 outline-none transition-all"
                     style={{
-                      backgroundColor: "#111",
-                      border: "1px solid rgba(255,255,255,0.08)",
+                      backgroundColor: "var(--bg-input)",
+                      border: "1px solid var(--border-medium)",
                       fontFamily: "Inter, sans-serif",
                       fontSize: "13px",
                     }}
@@ -152,8 +152,8 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom }: CreateRoomMod
                 onClick={handleCreate}
                 className="w-full py-3 rounded-xl text-white transition-all duration-200 cursor-pointer hover:brightness-110"
                 style={{
-                  backgroundColor: "#6366f1",
-                  boxShadow: "0 0 20px rgba(99, 102, 241, 0.25)",
+                  backgroundColor: "var(--accent)",
+                  boxShadow: "0 0 20px var(--accent-transparent-3)",
                   fontSize: "14px",
                   fontWeight: 500,
                 }}
@@ -162,7 +162,7 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom }: CreateRoomMod
               </button>
               <button
                 onClick={onClose}
-                className="w-full py-2 text-[#666] hover:text-white transition-colors cursor-pointer"
+                className="w-full py-2 text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
                 style={{ fontSize: "13px", fontWeight: 400 }}
               >
                 Cancel
