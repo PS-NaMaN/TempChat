@@ -6,16 +6,24 @@ const cors = require('cors');
 const roomManager = require('./roomManager');
 
 const app = express();
+
+const allowedOrigins = process.env.ALLOWED_ORIGIN
+    ? process.env.ALLOWED_ORIGIN.split(',')
+    : '*';
+
 app.use(cors({
-    origin: process.env.ALLOWED_ORIGIN || '*'
+    origin: allowedOrigins,
+    credentials: true
 }));
+
 app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: process.env.ALLOWED_ORIGIN || '*',
-        methods: ['GET', 'POST']
+        origin: allowedOrigins,
+        methods: ['GET', 'POST'],
+        credentials: true
     }
 });
 
