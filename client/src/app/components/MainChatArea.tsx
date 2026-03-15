@@ -33,7 +33,9 @@ export function MainChatArea({
   fingerprint
 }: MainChatAreaProps) {
   const [input, setInput] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounter = useRef(0);
 
   const handleSend = () => {
     if (input.trim() && activeRoomCode) {
@@ -60,8 +62,71 @@ export function MainChatArea({
     }
   };
 
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onSendImage) {
+      dragCounter.current++;
+      if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+        setIsDragging(true);
+      }
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onSendImage) {
+      dragCounter.current--;
+      if (dragCounter.current === 0) {
+        setIsDragging(false);
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounter.current = 0;
+
+    if (onSendImage && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('image/')) {
+        onSendImage(file);
+      }
+    }
+  };
+
   return (
-    <div className="flex-1 flex flex-col h-full transition-colors duration-200" style={{ backgroundColor: "var(--bg-chat)", fontFamily: "Inter, sans-serif" }}>
+    <div
+      className="flex-1 flex flex-col h-full transition-colors duration-200 relative"
+      style={{ backgroundColor: "var(--bg-chat)", fontFamily: "Inter, sans-serif" }}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag and Drop Overlay */}
+      {isDragging && onSendImage && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md transition-all duration-300">
+          <div className="flex flex-col items-center gap-4 p-8 rounded-3xl border-2 border-dashed border-[var(--accent)] bg-black/60 shadow-2xl scale-110 transform transition-transform duration-300">
+            <div className="p-5 rounded-full bg-[var(--accent)] text-white shadow-lg animate-bounce">
+              <ImagePlus className="w-10 h-10" />
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <h3 className="text-xl font-bold text-white">Drop image to send</h3>
+              <p className="text-white/60 text-sm">Release to share in the room</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Bar */}
       <div
         className="flex justify-between px-5 py-3"
