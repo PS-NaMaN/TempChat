@@ -141,7 +141,7 @@ function Dashboard() {
             };
 
             addMessage(newMsg);
-            saveEncryptedMessage({ id: parsed.id, roomId, iv, ciphertext, sender: 'other' });
+            saveEncryptedMessage({ id: parsed.id, roomId, text: parsed.text, time: parsed.time, sender: 'other' });
         } catch (e) {
             console.error("Failed to decrypt incoming message", e);
         }
@@ -161,12 +161,19 @@ function Dashboard() {
             let restoredMsgs = [];
 
             // Restore encrypted (already-sent) messages
-            if (savedKey) {
-                const encryptedMsgs = await getEncryptedMessages(roomId);
-                if (encryptedMsgs.length > 0) {
-                    try {
-                        const { decryptMessage } = await import('./hooks/useCrypto').then(m => m.useCrypto());
-                        for (const msg of encryptedMsgs) {
+            const storedMsgs = await getEncryptedMessages(roomId);
+            if (storedMsgs.length > 0) {
+                try {
+                    const { decryptMessage } = await import('./hooks/useCrypto').then(m => m.useCrypto());
+                    for (const msg of storedMsgs) {
+                        if (msg.text) {
+                            restoredMsgs.push({
+                                id: msg.id,
+                                text: msg.text,
+                                sender: msg.sender || 'me',
+                                time: msg.time || ''
+                            });
+                        } else if (msg.iv && msg.ciphertext && savedKey) {
                             try {
                                 const text = await decryptMessage(savedKey, msg.iv, msg.ciphertext);
                                 const parsed = JSON.parse(text);
@@ -180,9 +187,9 @@ function Dashboard() {
                                 console.error("Could not decrypt history msg", e);
                             }
                         }
-                    } catch (e) {
-                        console.error("Failed to load messages", e);
                     }
+                } catch (e) {
+                    console.error("Failed to load messages", e);
                 }
             }
 
@@ -225,8 +232,8 @@ function Dashboard() {
                         await saveEncryptedMessage({
                             id: item.id,
                             roomId,
-                            iv: encResult.iv,
-                            ciphertext: encResult.ciphertext,
+                            text: JSON.parse(item.plainPayload).text,
+                            time: JSON.parse(item.plainPayload).time,
                             sender: 'me'
                         });
                         await deletePendingMessage(item.id);
@@ -308,7 +315,7 @@ function Dashboard() {
             if (encResult) {
                 const newMsg = { id: timestamp.toString(), text, sender: 'me', time: timeStr };
                 addMessage(newMsg);
-                saveEncryptedMessage({ id: timestamp.toString(), roomId, iv: encResult.iv, ciphertext: encResult.ciphertext, sender: 'me' });
+                saveEncryptedMessage({ id: timestamp.toString(), roomId, text, time: timeStr, sender: 'me' });
             }
         } else {
             // No peer yet — queue the message in IndexedDB and show it in the UI

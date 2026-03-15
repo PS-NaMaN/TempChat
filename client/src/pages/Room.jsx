@@ -39,7 +39,8 @@ export default function Room() {
             };
 
             addMessage(newMsg);
-            saveEncryptedMessage({ id: parsed.id, roomId, iv, ciphertext, sender: 'other' });
+            // Store as plaintext to survive session reloads where sharedKey changes
+            saveEncryptedMessage({ id: parsed.id, roomId, text: parsed.text, time: parsed.time, sender: 'other' });
         } catch (e) {
             console.error("Failed to decrypt incoming message", e);
         }
@@ -92,28 +93,42 @@ export default function Room() {
             }
 
             const savedKey = sharedKey || await getRoomKey(roomId);
-            if (!savedKey) return;
 
-            const encryptedMsgs = await getEncryptedMessages(roomId);
-            if (encryptedMsgs.length > 0) {
+            const storedMsgs = await getEncryptedMessages(roomId);
+            if (storedMsgs.length > 0) {
                 try {
                     const { decryptMessage } = await import('../hooks/useCrypto').then(m => m.useCrypto());
                     const decryptedMsgs = [];
-                    for (const msg of encryptedMsgs) {
-                        try {
-                            const text = await decryptMessage(savedKey, msg.iv, msg.ciphertext);
-                            const parsed = JSON.parse(text);
+                    for (const msg of storedMsgs) {
+                        if (msg.text) {
+                            // Already stored as plaintext
                             decryptedMsgs.push({
-                                id: parsed.id,
-                                text: parsed.text,
-                                sender: msg.sender || parsed.sender || 'me', // Fallback for sender
-                                time: parsed.time
+                                id: msg.id,
+                                text: msg.text,
+                                sender: msg.sender || 'me',
+                                time: msg.time || ''
                             });
-                        } catch (e) {
-                            console.error("Could not decrypt history msg", e);
+                        } else if (msg.iv && msg.ciphertext && savedKey) {
+                            // Legacy encrypted message
+                            try {
+                                const text = await decryptMessage(savedKey, msg.iv, msg.ciphertext);
+                                const parsed = JSON.parse(text);
+                                decryptedMsgs.push({
+                                    id: parsed.id,
+                                    text: parsed.text,
+                                    sender: msg.sender || parsed.sender || 'me',
+                                    time: parsed.time
+                                });
+                            } catch (e) {
+                                console.error("Could not decrypt history msg", e);
+                            }
                         }
                     }
-                    setMessages(decryptedMsgs);
+
+                    // Filter duplicates and sort
+                    const uniqueMsgs = decryptedMsgs.filter((v, i, a) => a.findIndex(v2 => (v2.id === v.id)) === i);
+                    uniqueMsgs.sort((a, b) => Number(a.id) - Number(b.id));
+                    setMessages(uniqueMsgs);
                 } catch (e) {
                     console.error("Failed to load messages", e);
                 }
@@ -154,7 +169,8 @@ export default function Room() {
                 time: timeStr
             };
             addMessage(newMsg);
-            saveEncryptedMessage({ id: timestamp.toString(), roomId, iv: encResult.iv, ciphertext: encResult.ciphertext, sender: 'me' });
+            // Store as plaintext
+            saveEncryptedMessage({ id: timestamp.toString(), roomId, text, time: timeStr, sender: 'me' });
         }
     };
 
