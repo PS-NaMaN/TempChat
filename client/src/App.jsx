@@ -8,6 +8,7 @@ import { MainChatArea } from './app/components/MainChatArea';
 import { useChatStore } from './store/chatStore';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useStorage } from './hooks/useStorage';
+import { useCrypto } from './hooks/useCrypto';
 import { Lock, LogIn } from 'lucide-react';
 
 function Dashboard() {
@@ -49,6 +50,8 @@ function Dashboard() {
         saveRoomKey, getRoomKey, saveRecentRoom, getRecentRooms,
         savePendingMessage, getPendingMessages, deletePendingMessage
     } = useStorage();
+
+    const { encryptBinary } = useCrypto();
 
     const flushingRef = useRef(false);
 
@@ -147,7 +150,39 @@ function Dashboard() {
         }
     }, [roomId, addMessage, saveEncryptedMessage]);
 
-    const { sendMessage } = useWebRTC(isJoined ? roomId : null, password, handleDecryptedMessage);
+    const handleImageReceived = useCallback(async (imageData) => {
+        const currentSharedKey = useChatStore.getState().sharedKey;
+        if (!currentSharedKey) return;
+
+        try {
+            const { decryptBinary } = (await import('./hooks/useCrypto')).useCrypto();
+            const decryptedBuffer = await decryptBinary(currentSharedKey, imageData.iv, imageData.ciphertext);
+            const blob = new Blob([decryptedBuffer], { type: imageData.fileType });
+            const blobUrl = URL.createObjectURL(blob);
+
+            const base64 = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+            });
+
+            const newMsg = {
+                id: imageData.msgId,
+                text: '',
+                image: blobUrl,
+                imageBase64: base64,
+                sender: 'other',
+                time: imageData.time
+            };
+
+            addMessage(newMsg);
+            saveEncryptedMessage({ id: imageData.msgId, roomId, text: '', image: base64, time: imageData.time, sender: 'other' });
+        } catch (e) {
+            console.error("Failed to decrypt incoming image", e);
+        }
+    }, [roomId, addMessage, saveEncryptedMessage]);
+
+    const { sendMessage, sendImageChunks } = useWebRTC(isJoined ? roomId : null, password, handleDecryptedMessage, handleImageReceived);
 
     // Storage interactions (restoring messages upon loading a room)
     useEffect(() => {
@@ -166,7 +201,15 @@ function Dashboard() {
                 try {
                     const { decryptMessage } = await import('./hooks/useCrypto').then(m => m.useCrypto());
                     for (const msg of storedMsgs) {
-                        if (msg.text) {
+                        if (msg.image) {
+                            restoredMsgs.push({
+                                id: msg.id,
+                                text: msg.text || '',
+                                image: msg.image,
+                                sender: msg.sender || 'me',
+                                time: msg.time || ''
+                            });
+                        } else if (msg.text) {
                             restoredMsgs.push({
                                 id: msg.id,
                                 text: msg.text,
@@ -330,6 +373,52 @@ function Dashboard() {
         }
     };
 
+    const handleSendImage = async (file) => {
+        const currentSharedKey = useChatStore.getState().sharedKey;
+        if (!currentSharedKey || !file) return;
+
+        const timestamp = Date.now();
+        const timeStr = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const msgId = timestamp.toString();
+        const transferId = `img_${msgId}`;
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const encrypted = await encryptBinary(currentSharedKey, arrayBuffer);
+
+            const blobUrl = URL.createObjectURL(file);
+
+            const base64 = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(file);
+            });
+
+            const sent = await sendImageChunks(encrypted, {
+                transferId,
+                fileName: file.name,
+                fileType: file.type,
+                msgId,
+                time: timeStr
+            });
+
+            if (sent) {
+                const newMsg = {
+                    id: msgId,
+                    text: '',
+                    image: blobUrl,
+                    imageBase64: base64,
+                    sender: 'me',
+                    time: timeStr
+                };
+                addMessage(newMsg);
+                saveEncryptedMessage({ id: msgId, roomId, text: '', image: base64, time: timeStr, sender: 'me' });
+            }
+        } catch (e) {
+            console.error("Failed to send image", e);
+        }
+    };
+
     const handleClearCurrentChat = async () => {
         if (roomId) {
             if (confirm("Clear history for this chat?")) {
@@ -396,6 +485,7 @@ function Dashboard() {
                 activeRoomCode={roomId || null}
                 messages={messages}
                 onSendMessage={handleNewMessage}
+                onSendImage={handleSendImage}
                 onClearChat={handleClearCurrentChat}
                 onExportChat={handleExportChat}
                 connectionStatus={connectionStatus}

@@ -18,10 +18,20 @@ if (import.meta.env.VITE_TURN_URL) {
 
 const iceConfig = { iceServers };
 
-export function useWebRTC(roomId, password, onMessageDecrypted) {
+const IMAGE_CHUNK_SIZE = 16 * 1024; // 16KB chunks
+
+export function useWebRTC(roomId, password, onMessageDecrypted, onImageReceived) {
     const socketRef = useRef(null);
     const pcRef = useRef(null);
     const dcRef = useRef(null);
+    const imageBufferRef = useRef({});
+
+    // Store callbacks in refs to avoid re-creating setupDataChannel/initWebRTC
+    // when the callbacks change, which would tear down the entire WebRTC connection.
+    const onMessageDecryptedRef = useRef(onMessageDecrypted);
+    const onImageReceivedRef = useRef(onImageReceived);
+    onMessageDecryptedRef.current = onMessageDecrypted;
+    onImageReceivedRef.current = onImageReceived;
 
     const {
         setConnectionStatus, setRole, setFingerprint, setSharedKey,
@@ -70,8 +80,41 @@ export function useWebRTC(roomId, password, onMessageDecrypted) {
 
                     setConnectionStatus('encrypted');
                 } else if (payload.type === 'chat-message') {
-                    if (onMessageDecrypted) {
-                        onMessageDecrypted(payload.iv, payload.ciphertext);
+                    if (onMessageDecryptedRef.current) {
+                        onMessageDecryptedRef.current(payload.iv, payload.ciphertext);
+                    }
+                } else if (payload.type === 'image-start') {
+                    // Start buffering a new incoming image
+                    imageBufferRef.current[payload.transferId] = {
+                        totalChunks: payload.totalChunks,
+                        fileName: payload.fileName,
+                        fileType: payload.fileType,
+                        iv: payload.iv,
+                        msgId: payload.msgId,
+                        time: payload.time,
+                        chunks: []
+                    };
+                } else if (payload.type === 'image-chunk') {
+                    const buf = imageBufferRef.current[payload.transferId];
+                    if (buf) {
+                        buf.chunks[payload.index] = payload.data;
+                        // Check if all chunks received
+                        const received = buf.chunks.filter(Boolean).length;
+                        if (received === buf.totalChunks) {
+                            // Reconstruct the full encrypted array
+                            const fullArray = buf.chunks.flat();
+                            if (onImageReceivedRef.current) {
+                                onImageReceivedRef.current({
+                                    iv: buf.iv,
+                                    ciphertext: fullArray,
+                                    fileName: buf.fileName,
+                                    fileType: buf.fileType,
+                                    msgId: buf.msgId,
+                                    time: buf.time
+                                });
+                            }
+                            delete imageBufferRef.current[payload.transferId];
+                        }
                     }
                 }
             } catch (e) {
@@ -82,7 +125,7 @@ export function useWebRTC(roomId, password, onMessageDecrypted) {
         dc.onclose = () => {
             setConnectionStatus('peer_disconnected');
         };
-    }, [generateECDHKeys, deriveSharedKey, generateFingerprint, setConnectionStatus, setSharedKey, setFingerprint, onMessageDecrypted]);
+    }, [generateECDHKeys, deriveSharedKey, generateFingerprint, setConnectionStatus, setSharedKey, setFingerprint]);
 
     const initWebRTC = useCallback(async (role) => {
         pcRef.current = new RTCPeerConnection(iceConfig);
@@ -230,5 +273,47 @@ export function useWebRTC(roomId, password, onMessageDecrypted) {
         return null;
     };
 
-    return { sendMessage: sendTransportMessage };
+    const sendImageChunks = async (encryptedData, meta) => {
+        // encryptedData: { iv, ciphertext (number[]) }
+        // meta: { transferId, fileName, fileType, msgId, time }
+        if (dcRef.current?.readyState !== 'open') return false;
+
+        const cipherArray = encryptedData.ciphertext;
+        const totalChunks = Math.ceil(cipherArray.length / IMAGE_CHUNK_SIZE);
+
+        // Send start message
+        dcRef.current.send(JSON.stringify({
+            type: 'image-start',
+            transferId: meta.transferId,
+            totalChunks,
+            fileName: meta.fileName,
+            fileType: meta.fileType,
+            iv: encryptedData.iv,
+            msgId: meta.msgId,
+            time: meta.time
+        }));
+
+        // Send chunks
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * IMAGE_CHUNK_SIZE;
+            const end = Math.min(start + IMAGE_CHUNK_SIZE, cipherArray.length);
+            const chunk = cipherArray.slice(start, end);
+
+            dcRef.current.send(JSON.stringify({
+                type: 'image-chunk',
+                transferId: meta.transferId,
+                index: i,
+                data: chunk
+            }));
+
+            // Small delay between chunks to avoid overwhelming the channel
+            if (i < totalChunks - 1) {
+                await new Promise(r => setTimeout(r, 5));
+            }
+        }
+
+        return true;
+    };
+
+    return { sendMessage: sendTransportMessage, sendImageChunks };
 }

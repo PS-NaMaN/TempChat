@@ -50,6 +50,27 @@ const decryptMessage = async (sharedKey, ivArray, ciphertextArray) => {
     return new TextDecoder().decode(decryptedBuffer);
 };
 
+const encryptBinary = async (sharedKey, arrayBuffer) => {
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const ciphertextBuffer = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        sharedKey,
+        arrayBuffer
+    );
+    return { iv: Array.from(iv), ciphertext: Array.from(new Uint8Array(ciphertextBuffer)) };
+};
+
+const decryptBinary = async (sharedKey, ivArray, ciphertextArray) => {
+    const iv = new Uint8Array(ivArray);
+    const ciphertext = new Uint8Array(ciphertextArray);
+    const decryptedBuffer = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        sharedKey,
+        ciphertext
+    );
+    return decryptedBuffer;
+};
+
 const generateFingerprint = async (localJwk, remoteJwk) => {
     const sortedKeys = [localJwk.x, remoteJwk.x].sort();
     const combined = sortedKeys.join("-");
@@ -67,6 +88,8 @@ const staticMethods = {
     deriveSharedKey,
     encryptMessage,
     decryptMessage,
+    encryptBinary,
+    decryptBinary,
     generateFingerprint
 };
 

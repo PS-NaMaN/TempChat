@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { MainChatArea } from '../app/components/MainChatArea';
 import { useChatStore } from '../store/chatStore';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useStorage } from '../hooks/useStorage';
+import { useCrypto } from '../hooks/useCrypto';
 import { Lock, LogIn } from 'lucide-react';
 
 export default function Room() {
@@ -22,6 +23,7 @@ export default function Room() {
     } = useChatStore();
 
     const { saveEncryptedMessage, getEncryptedMessages, clearMessages, saveRoomKey, getRoomKey } = useStorage();
+    const { encryptBinary, decryptBinary } = useCrypto();
 
     const handleDecryptedMessage = useCallback(async (iv, ciphertext) => {
         const currentSharedKey = useChatStore.getState().sharedKey;
@@ -46,7 +48,41 @@ export default function Room() {
         }
     }, [roomId, addMessage, saveEncryptedMessage]);
 
-    const { sendMessage } = useWebRTC(isJoined ? roomId : null, password, handleDecryptedMessage);
+    const handleImageReceived = useCallback(async (imageData) => {
+        // imageData: { iv, ciphertext, fileName, fileType, msgId, time }
+        const currentSharedKey = useChatStore.getState().sharedKey;
+        if (!currentSharedKey) return;
+
+        try {
+            const { decryptBinary: decrypt } = (await import('../hooks/useCrypto')).useCrypto();
+            const decryptedBuffer = await decrypt(currentSharedKey, imageData.iv, imageData.ciphertext);
+            const blob = new Blob([decryptedBuffer], { type: imageData.fileType });
+            const blobUrl = URL.createObjectURL(blob);
+
+            // Convert to base64 for persistence
+            const base64 = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+            });
+
+            const newMsg = {
+                id: imageData.msgId,
+                text: '',
+                image: blobUrl,
+                imageBase64: base64,
+                sender: 'other',
+                time: imageData.time
+            };
+
+            addMessage(newMsg);
+            saveEncryptedMessage({ id: imageData.msgId, roomId, text: '', image: base64, time: imageData.time, sender: 'other' });
+        } catch (e) {
+            console.error("Failed to decrypt incoming image", e);
+        }
+    }, [roomId, addMessage, saveEncryptedMessage]);
+
+    const { sendMessage, sendImageChunks } = useWebRTC(isJoined ? roomId : null, password, handleDecryptedMessage, handleImageReceived);
 
     // Initial Check
     useEffect(() => {
@@ -100,7 +136,16 @@ export default function Room() {
                     const { decryptMessage } = await import('../hooks/useCrypto').then(m => m.useCrypto());
                     const decryptedMsgs = [];
                     for (const msg of storedMsgs) {
-                        if (msg.text) {
+                        if (msg.image) {
+                            // Image message stored as base64
+                            decryptedMsgs.push({
+                                id: msg.id,
+                                text: msg.text || '',
+                                image: msg.image,
+                                sender: msg.sender || 'me',
+                                time: msg.time || ''
+                            });
+                        } else if (msg.text) {
                             // Already stored as plaintext
                             decryptedMsgs.push({
                                 id: msg.id,
@@ -174,6 +219,54 @@ export default function Room() {
         }
     };
 
+    const handleSendImage = async (file) => {
+        const currentSharedKey = useChatStore.getState().sharedKey;
+        if (!currentSharedKey || !file) return;
+
+        const timestamp = Date.now();
+        const timeStr = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const msgId = timestamp.toString();
+        const transferId = `img_${msgId}`;
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const encrypted = await encryptBinary(currentSharedKey, arrayBuffer);
+
+            // Create local preview
+            const blobUrl = URL.createObjectURL(file);
+
+            // Convert to base64 for persistence
+            const base64 = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(file);
+            });
+
+            const sent = await sendImageChunks(encrypted, {
+                transferId,
+                fileName: file.name,
+                fileType: file.type,
+                msgId,
+                time: timeStr
+            });
+
+            if (sent) {
+                const newMsg = {
+                    id: msgId,
+                    text: '',
+                    image: blobUrl,
+                    imageBase64: base64,
+                    sender: 'me',
+                    time: timeStr
+                };
+                addMessage(newMsg);
+                saveEncryptedMessage({ id: msgId, roomId, text: '', image: base64, time: timeStr, sender: 'me' });
+            }
+        } catch (e) {
+            console.error("Failed to send image", e);
+        }
+    };
+
     const handleClearChat = async () => {
         await clearMessages(roomId);
         clearChat();
@@ -233,6 +326,7 @@ export default function Room() {
                     activeRoomCode={roomId}
                     messages={messages}
                     onSendMessage={handleSendMessage}
+                    onSendImage={handleSendImage}
                     onClearChat={handleClearChat}
                     onExportChat={handleExportChat}
                     connectionStatus={connectionStatus}

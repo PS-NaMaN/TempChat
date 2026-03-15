@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { Lock, Shield, Send, Download, Trash2, Clock } from "lucide-react";
+import { useState, useRef } from "react";
+import { Lock, Shield, Send, Download, Trash2, Clock, ImagePlus, X } from "lucide-react";
 
 interface Message {
   id: string;
   text: string;
+  image?: string;
+  imageBase64?: string;
   sender: "me" | "other";
   time: string;
   pending?: boolean;
@@ -13,6 +15,7 @@ interface MainChatAreaProps {
   activeRoomCode: string | null;
   messages: Message[];
   onSendMessage: (text: string) => void;
+  onSendImage?: (file: File) => void;
   onClearChat: () => void;
   onExportChat: () => void;
   connectionStatus: string;
@@ -23,12 +26,14 @@ export function MainChatArea({
   activeRoomCode,
   messages,
   onSendMessage,
+  onSendImage,
   onClearChat,
   onExportChat,
   connectionStatus,
   fingerprint
 }: MainChatAreaProps) {
   const [input, setInput] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSend = () => {
     if (input.trim() && activeRoomCode) {
@@ -41,6 +46,17 @@ export function MainChatArea({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/') && onSendImage) {
+      onSendImage(file);
+    }
+    // Reset the file input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -138,6 +154,16 @@ export function MainChatArea({
 
       {/* Message Input */}
       <div className="px-5 pb-5 pt-2">
+        {onSendImage && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            className="hidden"
+            id="image-upload-input"
+          />
+        )}
         <div
           className={`flex items-center gap-3 rounded-full px-4 py-2 transition-all ${activeRoomCode ? "" : "opacity-40"
             }`}
@@ -154,6 +180,17 @@ export function MainChatArea({
             className="flex-1 bg-transparent text-[var(--text-main)] placeholder-[var(--text-dark)] outline-none disabled:cursor-not-allowed"
             style={{ fontSize: "14px", fontWeight: 400 }}
           />
+          {onSendImage && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!activeRoomCode}
+              className="p-2 rounded-full transition-all duration-200 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center hover:bg-white/5"
+              title="Send Image"
+              id="image-upload-button"
+            >
+              <ImagePlus className="w-4 h-4 text-[var(--text-faint)]" />
+            </button>
+          )}
           <button
             onClick={handleSend}
             disabled={!activeRoomCode || !input.trim()}
@@ -172,51 +209,87 @@ export function MainChatArea({
 
 function MessageBubble({ msg }: { msg: Message }) {
   const [expanded, setExpanded] = useState(false);
-  const isLong = msg.text.length > 500;
-
+  const [showModal, setShowModal] = useState(false);
+  const isLong = msg.text && msg.text.length > 500;
   const displayText = isLong && !expanded ? msg.text.slice(0, 500) + "..." : msg.text;
+  const imageSrc = msg.image || msg.imageBase64;
 
   return (
-    <div
-      className="max-w-[70%] px-4 py-2.5 rounded-2xl flex flex-col"
-      style={{
-        backgroundColor: msg.sender === "me" ? "var(--accent)" : "var(--bg-chat-bubble-other)",
-        borderBottomRightRadius: msg.sender === "me" ? "6px" : "16px",
-        borderBottomLeftRadius: msg.sender === "other" ? "6px" : "16px",
-      }}
-    >
-      <p
-        className="whitespace-pre-wrap break-words"
-        style={{ color: msg.sender === "me" ? "var(--bg-chat-bubble-me-text)" : "var(--bg-chat-bubble-other-text)", fontSize: "14px", fontWeight: 400, lineHeight: 1.5, wordBreak: "break-word", overflowWrap: "break-word" }}
-      >
-        {displayText}
-      </p>
-
-      {isLong && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className={`self-start mt-1 text-[11px] font-medium hover:underline ${msg.sender === "me" ? "text-white/80" : "text-[var(--text-muted)]"}`}
-        >
-          {expanded ? "Show less" : "Read more"}
-        </button>
-      )}
-
+    <>
       <div
-        className={`mt-1 flex items-center gap-1 ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
+        className="max-w-[70%] px-4 py-2.5 rounded-2xl flex flex-col"
+        style={{
+          backgroundColor: msg.sender === "me" ? "var(--accent)" : "var(--bg-chat-bubble-other)",
+          borderBottomRightRadius: msg.sender === "me" ? "6px" : "16px",
+          borderBottomLeftRadius: msg.sender === "other" ? "6px" : "16px",
+        }}
       >
-        {msg.pending && (
-          <span className="flex items-center gap-0.5 text-white/40">
-            <Clock className="w-3 h-3" />
-            <span style={{ fontSize: "9px" }}>Queued</span>
-          </span>
+        {imageSrc && (
+          <img
+            src={imageSrc}
+            alt="Shared image"
+            className="rounded-xl mb-1.5 cursor-pointer hover:opacity-90 transition-opacity"
+            style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'cover' }}
+            onClick={() => setShowModal(true)}
+          />
         )}
-        <p
-          className={`${msg.sender === "me" ? "text-white/50" : "text-[var(--text-faint)]"}`}
-          style={{ fontSize: "10px" }}
+
+        {displayText && (
+          <p
+            className="whitespace-pre-wrap break-words"
+            style={{ color: msg.sender === "me" ? "var(--bg-chat-bubble-me-text)" : "var(--bg-chat-bubble-other-text)", fontSize: "14px", fontWeight: 400, lineHeight: 1.5, wordBreak: "break-word", overflowWrap: "break-word" }}
+          >
+            {displayText}
+          </p>
+        )}
+
+        {isLong && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className={`self-start mt-1 text-[11px] font-medium hover:underline ${msg.sender === "me" ? "text-white/80" : "text-[var(--text-muted)]"}`}
+          >
+            {expanded ? "Show less" : "Read more"}
+          </button>
+        )}
+
+        <div
+          className={`mt-1 flex items-center gap-1 ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
         >
-          {msg.time}
-        </p>
+          {msg.pending && (
+            <span className="flex items-center gap-0.5 text-white/40">
+              <Clock className="w-3 h-3" />
+              <span style={{ fontSize: "9px" }}>Queued</span>
+            </span>
+          )}
+          <p
+            className={`${msg.sender === "me" ? "text-white/50" : "text-[var(--text-faint)]"}`}
+            style={{ fontSize: "10px" }}
+          >
+            {msg.time}
+          </p>
+        </div>
       </div>
-    </div>
+
+      {/* Lightbox Modal */}
+      {showModal && imageSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setShowModal(false)}
+        >
+          <button
+            onClick={() => setShowModal(false)}
+            className="absolute top-6 right-6 p-2 text-white/70 hover:text-white transition-colors cursor-pointer rounded-full bg-white/10 hover:bg-white/20"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={imageSrc}
+            alt="Full size image"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
   );
 }
