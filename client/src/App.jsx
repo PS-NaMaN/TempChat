@@ -8,7 +8,7 @@ import { MainChatArea } from './app/components/MainChatArea';
 import { useChatStore } from './store/chatStore';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useStorage } from './hooks/useStorage';
-import { useCrypto } from './hooks/useCrypto';
+import { encryptBinary, decryptMessage, decryptBinary } from './hooks/useCrypto';
 import { Lock, LogIn } from 'lucide-react';
 
 function Dashboard() {
@@ -50,8 +50,6 @@ function Dashboard() {
         saveRoomKey, getRoomKey, saveRecentRoom, getRecentRooms,
         savePendingMessage, getPendingMessages, deletePendingMessage
     } = useStorage();
-
-    const { encryptBinary } = useCrypto();
 
     const flushingRef = useRef(false);
 
@@ -133,7 +131,6 @@ function Dashboard() {
         if (!currentSharedKey) return;
 
         try {
-            const { decryptMessage } = await import('./hooks/useCrypto').then(m => m.useCrypto());
             const decryptedText = await decryptMessage(currentSharedKey, iv, ciphertext);
             const parsed = JSON.parse(decryptedText);
             const newMsg = {
@@ -155,7 +152,6 @@ function Dashboard() {
         if (!currentSharedKey) return;
 
         try {
-            const { decryptBinary } = (await import('./hooks/useCrypto')).useCrypto();
             const decryptedBuffer = await decryptBinary(currentSharedKey, imageData.iv, imageData.ciphertext);
             const blob = new Blob([decryptedBuffer], { type: imageData.fileType });
             const blobUrl = URL.createObjectURL(blob);
@@ -199,7 +195,6 @@ function Dashboard() {
             const storedMsgs = await getEncryptedMessages(roomId);
             if (storedMsgs.length > 0) {
                 try {
-                    const { decryptMessage } = await import('./hooks/useCrypto').then(m => m.useCrypto());
                     for (const msg of storedMsgs) {
                         if (msg.image) {
                             restoredMsgs.push({

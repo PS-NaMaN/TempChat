@@ -1,4 +1,4 @@
-const generateECDHKeys = async () => {
+export const generateECDHKeys = async () => {
     const keyPair = await window.crypto.subtle.generateKey(
         { name: "ECDH", namedCurve: "P-256" },
         false,
@@ -8,7 +8,7 @@ const generateECDHKeys = async () => {
     return { keyPair, jwk };
 };
 
-const deriveSharedKey = async (localPrivateKey, remoteJwk) => {
+export const deriveSharedKey = async (localPrivateKey, remoteJwk) => {
     const remotePublicKey = await window.crypto.subtle.importKey(
         "jwk",
         remoteJwk,
@@ -25,7 +25,7 @@ const deriveSharedKey = async (localPrivateKey, remoteJwk) => {
     );
 };
 
-const encryptMessage = async (sharedKey, messageText) => {
+export const encryptMessage = async (sharedKey, messageText) => {
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
     const encodedMessage = new TextEncoder().encode(messageText);
     const ciphertextBuffer = await window.crypto.subtle.encrypt(
@@ -39,7 +39,7 @@ const encryptMessage = async (sharedKey, messageText) => {
     };
 };
 
-const decryptMessage = async (sharedKey, ivArray, ciphertextArray) => {
+export const decryptMessage = async (sharedKey, ivArray, ciphertextArray) => {
     const iv = new Uint8Array(ivArray);
     const ciphertext = new Uint8Array(ciphertextArray);
     const decryptedBuffer = await window.crypto.subtle.decrypt(
@@ -50,7 +50,7 @@ const decryptMessage = async (sharedKey, ivArray, ciphertextArray) => {
     return new TextDecoder().decode(decryptedBuffer);
 };
 
-const encryptBinary = async (sharedKey, arrayBuffer) => {
+export const encryptBinary = async (sharedKey, arrayBuffer) => {
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
     const ciphertextBuffer = await window.crypto.subtle.encrypt(
         { name: "AES-GCM", iv },
@@ -60,7 +60,7 @@ const encryptBinary = async (sharedKey, arrayBuffer) => {
     return { iv: Array.from(iv), ciphertext: Array.from(new Uint8Array(ciphertextBuffer)) };
 };
 
-const decryptBinary = async (sharedKey, ivArray, ciphertextArray) => {
+export const decryptBinary = async (sharedKey, ivArray, ciphertextArray) => {
     const iv = new Uint8Array(ivArray);
     const ciphertext = new Uint8Array(ciphertextArray);
     const decryptedBuffer = await window.crypto.subtle.decrypt(
@@ -71,7 +71,7 @@ const decryptBinary = async (sharedKey, ivArray, ciphertextArray) => {
     return decryptedBuffer;
 };
 
-const generateFingerprint = async (localJwk, remoteJwk) => {
+export const generateFingerprint = async (localJwk, remoteJwk) => {
     const sortedKeys = [localJwk.x, remoteJwk.x].sort();
     const combined = sortedKeys.join("-");
     const hashBuffer = await window.crypto.subtle.digest(
@@ -82,15 +82,3 @@ const generateFingerprint = async (localJwk, remoteJwk) => {
     const hexHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     return `🔑 Session: ${hexHash.substring(0, 8)}`;
 };
-
-const staticMethods = {
-    generateECDHKeys,
-    deriveSharedKey,
-    encryptMessage,
-    decryptMessage,
-    encryptBinary,
-    decryptBinary,
-    generateFingerprint
-};
-
-export const useCrypto = () => staticMethods;

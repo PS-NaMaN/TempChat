@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useChatStore } from '../store/chatStore';
-import { useCrypto } from './useCrypto';
+import { generateECDHKeys, deriveSharedKey, generateFingerprint, encryptMessage } from './useCrypto';
 
 const SIGNALING_SERVER_URL = import.meta.env.VITE_SIGNALING_SERVER_URL || 'http://localhost:3001';
 
@@ -37,9 +37,6 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onImageReceived)
         setConnectionStatus, setRole, setFingerprint, setSharedKey,
         sharedKey
     } = useChatStore();
-    const {
-        generateECDHKeys, deriveSharedKey, generateFingerprint, encryptMessage
-    } = useCrypto();
 
     const keysRef = useRef(null);
 
@@ -157,7 +154,9 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onImageReceived)
         if (!roomId) return;
 
         setConnectionStatus('connecting');
-        socketRef.current = io(SIGNALING_SERVER_URL);
+        socketRef.current = io(SIGNALING_SERVER_URL, {
+            transports: ['websocket', 'polling']
+        });
 
         socketRef.current.on('connect', () => {
             socketRef.current.emit('join_room', { roomId, password }, async (response) => {

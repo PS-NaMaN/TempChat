@@ -4,7 +4,7 @@ import { MainChatArea } from '../app/components/MainChatArea';
 import { useChatStore } from '../store/chatStore';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useStorage } from '../hooks/useStorage';
-import { useCrypto } from '../hooks/useCrypto';
+import { encryptBinary, decryptBinary, decryptMessage } from '../hooks/useCrypto';
 import { Lock, LogIn } from 'lucide-react';
 
 export default function Room() {
