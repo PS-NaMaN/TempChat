@@ -80,6 +80,10 @@ app.post('/api/rooms/check', async (req, res) => {
     });
 });
 
+io.on('connection_error', (err) => {
+    console.error('Socket.io connection error:', err);
+});
+
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 

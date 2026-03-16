@@ -155,13 +155,14 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onImageReceived)
 
         setConnectionStatus('connecting');
         socketRef.current = io(SIGNALING_SERVER_URL, {
-            transports: ['websocket', 'polling']
+            transports: ['polling', 'websocket']
         });
 
         socketRef.current.on('connect', () => {
+            console.log('Connected to signaling server:', socketRef.current.id);
             socketRef.current.emit('join_room', { roomId, password }, async (response) => {
                 if (response.error) {
-                    console.error("WebRTC Error:", response.error);
+                    console.error("WebRTC Join Error:", response.error);
                     setConnectionStatus(response.error === 'Room not found' ? 'disconnected (expired)' : response.error === 'Room is full' ? 'room_full' : 'disconnected');
                     if (response.error !== 'Room not found' && response.error !== 'Room is full') {
                         alert(response.error);
@@ -175,10 +176,21 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onImageReceived)
                 if (role === 'answerer') {
                     await initWebRTC(role);
                 } else if (role === 'offerer' && usersCount > 1) {
-                    // the offerer has rejoined a room where the answerer is already waiting
                     await initWebRTC(role);
                 }
             });
+        });
+
+        socketRef.current.on('connect_error', (err) => {
+            console.error('Signaling Connect Error:', err.message);
+            console.error('Error Details:', err);
+        });
+
+        socketRef.current.on('disconnect', (reason) => {
+            console.log('Signaling Disconnected:', reason);
+            if (reason === 'io server disconnect') {
+                socketRef.current.connect();
+            }
         });
 
         let pendingCandidates = [];
