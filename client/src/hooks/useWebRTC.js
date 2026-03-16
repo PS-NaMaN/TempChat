@@ -5,18 +5,38 @@ import { generateECDHKeys, deriveSharedKey, generateFingerprint, encryptMessage 
 
 const SIGNALING_SERVER_URL = import.meta.env.VITE_SIGNALING_SERVER_URL || 'http://localhost:3001';
 
-const iceServers = [
-    { urls: "stun:stun.l.google.com:19302" }
+// Comprehensive list of public STUN servers. The connection will automatically
+// cycle through them if one fails to establish a peer-to-peer connection.
+const STUN_SERVERS = [
+    "stun:stun.l.google.com:19302",
+    "stun:stun1.l.google.com:19302",
+    "stun:stun2.l.google.com:19302",
+    "stun:stun3.l.google.com:19302",
+    "stun:stun4.l.google.com:19302",
+    "stun:stun.cloudflare.com:3478",
+    "stun:stun.relay.metered.ca:80",
+    "stun:global.stun.twilio.com:3478",
+    "stun:stun.nextcloud.com:443",
+    "stun:freestun.net:3478",
+    "stun:stun.voip.blackberry.com:3478",
+    "stun:stun.sipgate.net:3478",
 ];
-if (import.meta.env.VITE_TURN_URL) {
-    iceServers.push({
-        urls: import.meta.env.VITE_TURN_URL,
-        username: import.meta.env.VITE_TURN_USERNAME,
-        credential: import.meta.env.VITE_TURN_CREDENTIAL
-    });
-}
 
-const iceConfig = { iceServers };
+function buildIceConfig(stunIndex = 0) {
+    // Use 3 STUN servers at a time, starting from the given index, wrapping around
+    const servers = [];
+    for (let i = 0; i < 3; i++) {
+        servers.push({ urls: STUN_SERVERS[(stunIndex + i) % STUN_SERVERS.length] });
+    }
+    if (import.meta.env.VITE_TURN_URL) {
+        servers.push({
+            urls: import.meta.env.VITE_TURN_URL,
+            username: import.meta.env.VITE_TURN_USERNAME,
+            credential: import.meta.env.VITE_TURN_CREDENTIAL
+        });
+    }
+    return { iceServers: servers };
+}
 
 const IMAGE_CHUNK_SIZE = 16 * 1024; // 16KB chunks
 
@@ -39,6 +59,8 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onImageReceived)
     } = useChatStore();
 
     const keysRef = useRef(null);
+    const stunIndexRef = useRef(0);     // tracks which STUN server batch to try next
+    const currentRoleRef = useRef(null); // remembers role for retries
 
     const setupDataChannel = useCallback((dc) => {
         dcRef.current = dc;
@@ -124,7 +146,14 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onImageReceived)
         };
     }, [generateECDHKeys, deriveSharedKey, generateFingerprint, setConnectionStatus, setSharedKey, setFingerprint]);
 
-    const initWebRTC = useCallback(async (role) => {
+    const initWebRTC = useCallback(async (role, stunIndex = 0) => {
+        currentRoleRef.current = role;
+        stunIndexRef.current = stunIndex;
+
+        const iceConfig = buildIceConfig(stunIndex);
+        const stunLabel = STUN_SERVERS[stunIndex % STUN_SERVERS.length];
+        console.log(`[WebRTC] Trying STUN batch starting at index ${stunIndex}: ${stunLabel}`);
+
         pcRef.current = new RTCPeerConnection(iceConfig);
 
         pcRef.current.onicecandidate = (event) => {
@@ -133,6 +162,27 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onImageReceived)
                     roomId,
                     candidate: event.candidate
                 });
+            }
+        };
+
+        // Monitor ICE connection state and retry with the next STUN server batch on failure
+        pcRef.current.oniceconnectionstatechange = () => {
+            const state = pcRef.current?.iceConnectionState;
+            console.log(`[WebRTC] ICE connection state: ${state} (STUN index: ${stunIndex})`);
+
+            if (state === 'failed' || state === 'disconnected') {
+                const nextIndex = (stunIndex + 3) % STUN_SERVERS.length;
+                console.warn(`[WebRTC] ICE ${state}. Retrying with next STUN batch (index: ${nextIndex})...`);
+
+                // Close the failed connection and retry
+                if (pcRef.current) {
+                    pcRef.current.close();
+                    pcRef.current = null;
+                }
+                // Only the offerer drives reconnection; the answerer reacts to the new offer
+                if (currentRoleRef.current === 'offerer') {
+                    initWebRTC('offerer', nextIndex);
+                }
             }
         };
 
