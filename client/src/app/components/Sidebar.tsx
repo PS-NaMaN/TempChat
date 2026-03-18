@@ -1,4 +1,4 @@
-import { Lock, Plus, LogIn, Settings, Copy, Check, X } from "lucide-react";
+import { Lock, Plus, LogIn, Settings, Copy, Check, X, Info } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
@@ -14,12 +14,13 @@ interface SidebarProps {
   onJoinRoom: () => void;
   onSelectRoom: (code: string) => void;
   onOpenSettings: () => void;
+  onOpenAbout: () => void;
   activeRoomCode: string | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenSettings, activeRoomCode, isOpen, onClose }: SidebarProps) {
+export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenSettings, onOpenAbout, activeRoomCode, isOpen, onClose }: SidebarProps) {
   return (
     <>
       {/* Mobile Overlay */}
@@ -98,7 +99,17 @@ export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenS
       </div>
 
       {/* Footer */}
-      <div className="px-4 pb-2 pt-1">
+      <div className="px-4 pb-2 pt-1 flex flex-col gap-1">
+        <button
+          onClick={() => {
+            onOpenAbout();
+            onClose();
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--hover-bg)] transition-all duration-150 cursor-pointer"
+        >
+          <Info className="w-4 h-4" />
+          <span style={{ fontSize: "13px", fontWeight: 400 }}>About</span>
+        </button>
         <button
           onClick={() => {
             onOpenSettings();

@@ -4,6 +4,7 @@ import { Sidebar } from './app/components/Sidebar';
 import { CreateRoomModal } from './app/components/CreateRoomModal';
 import { JoinRoomModal } from './app/components/JoinRoomModal';
 import { SettingsModal } from './app/components/SettingsModal';
+import { AboutModal } from './app/components/AboutModal';
 import { MainChatArea } from './app/components/MainChatArea';
 import { useChatStore } from './store/chatStore';
 import { useWebRTC } from './hooks/useWebRTC';
@@ -20,6 +21,7 @@ function Dashboard() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [showAboutModal, setShowAboutModal] = useState(false);
 
     const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'slate');
     const [accent, setAccent] = useState(() => localStorage.getItem('accent') || '#6366f1');
@@ -537,6 +539,7 @@ function Dashboard() {
                 onJoinRoom={() => setShowJoinModal(true)}
                 onSelectRoom={(code) => navigate(`/${code}`)}
                 onOpenSettings={() => setShowSettingsModal(true)}
+                onOpenAbout={() => setShowAboutModal(true)}
                 activeRoomCode={roomId || null}
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
@@ -563,6 +566,10 @@ function Dashboard() {
                 setTheme={setTheme}
                 accent={accent}
                 setAccent={setAccent}
+            />
+            <AboutModal
+                isOpen={showAboutModal}
+                onClose={() => setShowAboutModal(false)}
             />
         </div>
     );
