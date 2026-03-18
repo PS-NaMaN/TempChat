@@ -34,7 +34,7 @@ export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenS
         <div className="px-5 pt-6 pb-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity" onClick={onClose}>
             <Lock className="w-4 h-4 text-[var(--accent)]" />
-            <span className="text-[var(--text-main)] tracking-widest" style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "0.15em" }}>CIPHER</span>
+            <span className="text-[var(--text-main)] tracking-widest uppercase" style={{ fontSize: "14px", fontWeight: 700, letterSpacing: "0.15em" }}>TEMPCHAT</span>
           </Link>
           <button onClick={onClose} className="md:hidden p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:text-[var(--text-main)] transition-all">
             <X className="w-5 h-5" />
