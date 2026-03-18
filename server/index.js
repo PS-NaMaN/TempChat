@@ -3,9 +3,38 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const roomManager = require('./roomManager');
 
 const app = express();
+
+// --- API Rate Limiters ---
+const createRoomLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 30, // Limit each IP to 30 room creations per window
+    message: { error: 'Too many rooms created from this IP, please try again in a minute' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const checkRoomLimiter = rateLimit({
+    windowMs: 60 * 1000, 
+    max: 120, // Limit each IP to 120 room checks per window
+    message: { error: 'Too many room checks from this IP, please try again in a minute' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const standardLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 200, // Limit each IP to 200 general requests per window
+    message: 'Too many requests from this IP'
+});
+
+// --- Socket.io Rate Limiting ---
+const SOCKET_RATE_LIMIT = 240; // events per minute
+const SOCKET_RATE_WINDOW = 60 * 1000; 
+const socketMessageCounts = new Map();
 
 const allowedOrigins = process.env.ALLOWED_ORIGIN
     ? process.env.ALLOWED_ORIGIN.split(',')
@@ -36,11 +65,11 @@ const io = new Server(server, {
     transports: ['websocket', 'polling']
 });
 
-app.get('/', (req, res) => {
+app.get('/', standardLimiter, (req, res) => {
     res.send('Signaling server is running');
 });
 
-app.post('/api/rooms/create', async (req, res) => {
+app.post('/api/rooms/create', createRoomLimiter, async (req, res) => {
     try {
         const { roomId, password } = req.body;
         if (!roomId) return res.status(400).json({ error: 'roomId required' });
@@ -57,7 +86,7 @@ app.post('/api/rooms/create', async (req, res) => {
     }
 });
 
-app.post('/api/rooms/check', async (req, res) => {
+app.post('/api/rooms/check', checkRoomLimiter, async (req, res) => {
     const { roomId } = req.body;
     const room = roomManager.getRoom(roomId);
 
@@ -86,6 +115,28 @@ io.on('connection_error', (err) => {
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
+
+    // Socket rate limiter middleware
+    socket.use(([event, ...args], next) => {
+        const now = Date.now();
+        let record = socketMessageCounts.get(socket.id);
+
+        if (!record || now > record.resetTime) {
+            record = { count: 1, resetTime: now + SOCKET_RATE_WINDOW };
+            socketMessageCounts.set(socket.id, record);
+            return next();
+        }
+
+        record.count++;
+        if (record.count > SOCKET_RATE_LIMIT) {
+            socket.emit('error', 'Rate limit exceeded');
+            console.warn(`Socket ${socket.id} exceeded rate limit. Event: ${event}`);
+            // Drop the event to protect the server
+            return next(new Error('Rate limit exceeded'));
+        }
+        
+        next();
+    });
 
     socket.on('join_room', async ({ roomId, password }, callback) => {
         const room = roomManager.getRoom(roomId);
@@ -143,6 +194,7 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
+        socketMessageCounts.delete(socket.id); // Clean up rate limiter memory
         const roomId = roomManager.removeUserGlobally(socket.id);
         if (roomId) {
             socket.to(roomId).emit('peer_disconnected');
