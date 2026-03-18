@@ -79,7 +79,7 @@ export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenS
       </div>
 
       {/* Recent Rooms */}
-      <div className="mt-8 px-4 flex-1">
+      <div className="mt-8 px-4 flex-1 overflow-y-auto custom-scrollbar">
         <span className="text-[var(--text-faint)] uppercase tracking-wider" style={{ fontSize: "10px", fontWeight: 600 }}>
           Recent Rooms
         </span>

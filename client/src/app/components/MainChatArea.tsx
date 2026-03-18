@@ -231,7 +231,7 @@ export function MainChatArea({
       </div>
 
       {/* Chat Content */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-4">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-4 custom-scrollbar">
         {!activeRoomCode ? (
           /* Empty State */
           <div className="flex flex-col items-center justify-center h-full gap-4">
