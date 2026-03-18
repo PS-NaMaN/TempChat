@@ -23,6 +23,7 @@ function Dashboard() {
 
     const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'slate');
     const [accent, setAccent] = useState(() => localStorage.getItem('accent') || '#6366f1');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
@@ -72,8 +73,11 @@ function Dashboard() {
 
         if (!roomId) {
             setRoomId(null);
+            setIsSidebarOpen(true);
             return;
         }
+
+        setIsSidebarOpen(false);
 
         const navPassword = location.state?.password || '';
         setPassword(navPassword);
@@ -485,12 +489,48 @@ function Dashboard() {
                 onExportChat={handleExportChat}
                 connectionStatus={connectionStatus}
                 fingerprint={fingerprint}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
             />
         );
     }
 
+    const touchStartX = useRef(null);
+    const touchEndX = useRef(null);
+    const minSwipeDistance = 50;
+
+    const onTouchStart = (e) => {
+        touchStartX.current = e.targetTouches[0].clientX;
+    };
+
+    const onTouchMove = (e) => {
+        touchEndX.current = e.targetTouches[0].clientX;
+    };
+
+    const onTouchEnd = () => {
+        if (!touchStartX.current || !touchEndX.current) return;
+        const distance = touchStartX.current - touchEndX.current;
+        const isLeftSwipe = distance > minSwipeDistance;
+        const isRightSwipe = distance < -minSwipeDistance;
+        
+        if (isLeftSwipe) {
+            setIsSidebarOpen(false); // Swipe left to close
+        }
+        if (isRightSwipe) {
+            setIsSidebarOpen(true); // Swipe right to open
+        }
+        
+        touchStartX.current = null;
+        touchEndX.current = null;
+    };
+
     return (
-        <div className="h-full w-full flex transition-colors duration-200" style={{ fontFamily: "Inter, sans-serif", backgroundColor: "var(--bg-main)", color: "var(--text-main)" }}>
+        <div 
+            className="h-[100dvh] w-full flex transition-colors duration-200 overflow-hidden relative" 
+            style={{ fontFamily: "Inter, sans-serif", backgroundColor: "var(--bg-main)", color: "var(--text-main)" }}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+        >
             <Sidebar
                 rooms={rooms}
                 onCreateRoom={() => setShowCreateModal(true)}
@@ -498,6 +538,8 @@ function Dashboard() {
                 onSelectRoom={(code) => navigate(`/${code}`)}
                 onOpenSettings={() => setShowSettingsModal(true)}
                 activeRoomCode={roomId || null}
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
             />
 
             <div className="flex-1 h-full relative">

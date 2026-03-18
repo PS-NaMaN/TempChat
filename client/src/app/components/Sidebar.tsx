@@ -1,4 +1,4 @@
-import { Lock, Plus, LogIn, Settings, Copy, Check } from "lucide-react";
+import { Lock, Plus, LogIn, Settings, Copy, Check, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
@@ -15,23 +15,39 @@ interface SidebarProps {
   onSelectRoom: (code: string) => void;
   onOpenSettings: () => void;
   activeRoomCode: string | null;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenSettings, activeRoomCode }: SidebarProps) {
+export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenSettings, activeRoomCode, isOpen, onClose }: SidebarProps) {
   return (
-    <div className="w-[260px] min-w-[260px] h-full flex flex-col transition-colors duration-200" style={{ backgroundColor: "var(--bg-sidebar)", fontFamily: "Inter, sans-serif" }}>
-      {/* Logo */}
-      <div className="px-5 pt-6 pb-4">
-        <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <Lock className="w-4 h-4 text-[var(--accent)]" />
-          <span className="text-[var(--text-main)] tracking-widest" style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "0.15em" }}>CIPHER</span>
-        </Link>
-      </div>
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={onClose}
+        />
+      )}
+      <div className={`fixed inset-y-0 left-0 z-50 md:relative w-[280px] sm:w-[260px] min-w-[260px] h-full flex flex-col transition-transform duration-300 md:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"}`} style={{ backgroundColor: "var(--bg-sidebar)", fontFamily: "Inter, sans-serif", borderRight: "1px solid var(--border-light)" }}>
+        {/* Logo */}
+        <div className="px-5 pt-6 pb-4 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity" onClick={onClose}>
+            <Lock className="w-4 h-4 text-[var(--accent)]" />
+            <span className="text-[var(--text-main)] tracking-widest" style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "0.15em" }}>CIPHER</span>
+          </Link>
+          <button onClick={onClose} className="md:hidden p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:text-[var(--text-main)] transition-all">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
       {/* Buttons */}
       <div className="px-4 flex flex-col gap-2.5 mt-2">
         <button
-          onClick={onCreateRoom}
+          onClick={() => {
+            onCreateRoom();
+            onClose();
+          }}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-white transition-all duration-200 cursor-pointer hover:brightness-110"
           style={{
             backgroundColor: "var(--accent)",
@@ -44,7 +60,10 @@ export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenS
           Create Room
         </button>
         <button
-          onClick={onJoinRoom}
+          onClick={() => {
+            onJoinRoom();
+            onClose();
+          }}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-[var(--text-main)] border transition-all duration-200 cursor-pointer hover:bg-[var(--hover-bg)]"
           style={{
             borderColor: "var(--accent)",
@@ -69,7 +88,10 @@ export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenS
               key={room.code}
               room={room}
               isActive={activeRoomCode === room.code}
-              onSelect={() => onSelectRoom(room.code)}
+              onSelect={() => {
+                onSelectRoom(room.code);
+                onClose();
+              }}
             />
           ))}
         </div>
@@ -78,7 +100,10 @@ export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenS
       {/* Footer */}
       <div className="px-4 pb-2 pt-1">
         <button
-          onClick={onOpenSettings}
+          onClick={() => {
+            onOpenSettings();
+            onClose();
+          }}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--hover-bg)] transition-all duration-150 cursor-pointer"
         >
           <Settings className="w-4 h-4" />
@@ -89,6 +114,7 @@ export function Sidebar({ rooms, onCreateRoom, onJoinRoom, onSelectRoom, onOpenS
         <span className="text-[var(--text-dark)]" style={{ fontSize: "11px" }}>End-to-end encrypted</span>
       </div>
     </div>
+    </>
   );
 }
 

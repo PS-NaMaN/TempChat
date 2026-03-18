@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Lock, Shield, Send, Download, Trash2, Clock, ImagePlus, X } from "lucide-react";
+import { Lock, Shield, Send, Download, Trash2, Clock, ImagePlus, X, Menu } from "lucide-react";
 
 interface Message {
   id: string;
@@ -20,6 +20,7 @@ interface MainChatAreaProps {
   onExportChat: () => void;
   connectionStatus: string;
   fingerprint: string | null;
+  onOpenSidebar: () => void;
 }
 
 export function MainChatArea({
@@ -30,7 +31,8 @@ export function MainChatArea({
   onClearChat,
   onExportChat,
   connectionStatus,
-  fingerprint
+  fingerprint,
+  onOpenSidebar
 }: MainChatAreaProps) {
   const [input, setInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
@@ -129,26 +131,74 @@ export function MainChatArea({
 
       {/* Top Bar */}
       <div
-        className="flex justify-between px-5 py-3"
+        className={`flex ${activeRoomCode ? "flex-col md:flex-row" : "flex-row"} items-center justify-between px-3 sm:px-5 py-2 sm:py-3 min-h-[56px] sm:min-h-[60px] ${activeRoomCode ? "gap-2 md:gap-0" : "gap-0"}`}
         style={{ borderBottom: "1px solid var(--border-light)" }}
       >
-        <div className="flex flex-col gap-1">
-          {activeRoomCode ? (
-            <span className="text-[var(--text-secondary)]" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
-              Room: {activeRoomCode}
+        {/* Connection Status - Top Center for Mobile */}
+        {activeRoomCode && (
+          <div className="flex md:hidden items-center justify-center gap-2 w-full pt-1">
+            <span className="relative flex h-2 w-2">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${connectionStatus === 'encrypted' ? 'bg-emerald-400' : (connectionStatus === 'peer_disconnected' || connectionStatus === 'room_full') ? 'hidden' : 'bg-yellow-400'}`} />
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${connectionStatus === 'encrypted' ? 'bg-emerald-400' : (connectionStatus === 'peer_disconnected' || connectionStatus === 'room_full') ? 'bg-red-500' : 'bg-yellow-400'}`} />
             </span>
-          ) : (
-            <span className="text-[var(--text-dark)]" style={{ fontSize: "13px" }}>No room selected</span>
-          )}
-          {fingerprint && (
-            <span className="text-[var(--text-faint)] opacity-80" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "10px" }}>
-              {fingerprint}
+            <span className={connectionStatus === 'encrypted' ? "text-emerald-400" : (connectionStatus === 'peer_disconnected' || connectionStatus === 'room_full') ? "text-red-500" : "text-yellow-400"} style={{ fontSize: "11px", fontWeight: 400 }}>
+              {connectionStatus === 'disconnected' ? 'Disconnected' :
+                connectionStatus === 'room_full' ? 'Room Full' :
+                  connectionStatus === 'connecting' ? 'Connecting...' :
+                    connectionStatus === 'connected' ? 'Connected (Exchanging Keys)' :
+                      connectionStatus === 'encrypted' ? '🔒 Encrypted & Connected' :
+                        connectionStatus === 'peer_disconnected' ? 'Peer disconnected' : connectionStatus}
             </span>
+          </div>
+        )}
+
+        {/* Main Header Content Row */}
+        <div className="flex items-center justify-between md:justify-start gap-2 sm:gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={onOpenSidebar}
+              className="md:hidden p-2 -ml-2 text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--hover-bg)] rounded-lg transition-colors flex-shrink-0"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex flex-col gap-0.5">
+              {activeRoomCode ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--text-secondary)]" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+                    <span className="hidden sm:inline">Room: </span>{activeRoomCode}
+                  </span>
+                  {fingerprint && (
+                    <span className="hidden md:block text-[var(--text-faint)] opacity-80" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "10px" }}>
+                      {fingerprint}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-[var(--text-dark)]" style={{ fontSize: "13px" }}>No room selected</span>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons for Mobile - Aligned with Menu/RoomCode */}
+          {activeRoomCode && (
+            <div className="flex md:hidden items-center gap-1">
+              <button onClick={onExportChat} className="p-2 text-[var(--text-faint)] hover:text-[var(--text-main)] transition-colors cursor-pointer rounded-lg hover:bg-[var(--hover-bg)]" title="Export Chat">
+                <Download className="w-4 h-4" />
+              </button>
+              <button
+                onClick={onClearChat}
+                className="p-2 text-[var(--text-faint)] hover:text-red-400 transition-colors cursor-pointer rounded-lg hover:bg-[var(--hover-bg)]"
+                title="Clear Chat History"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           )}
         </div>
 
+        {/* Desktop-only Right Side Content */}
         {activeRoomCode && (
-          <div className="flex flex-col items-end gap-1">
+          <div className="hidden md:flex flex-col items-end gap-1">
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
                 <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${connectionStatus === 'encrypted' ? 'bg-emerald-400' : (connectionStatus === 'peer_disconnected' || connectionStatus === 'room_full') ? 'hidden' : 'bg-yellow-400'}`} />
@@ -181,7 +231,7 @@ export function MainChatArea({
       </div>
 
       {/* Chat Content */}
-      <div className="flex-1 overflow-y-auto px-5 py-4">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-4">
         {!activeRoomCode ? (
           /* Empty State */
           <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -218,7 +268,7 @@ export function MainChatArea({
       </div>
 
       {/* Message Input */}
-      <div className="px-5 pb-5 pt-2">
+      <div className="px-3 sm:px-5 pb-5 pt-2">
         {onSendImage && (
           <input
             ref={fileInputRef}
@@ -282,7 +332,7 @@ function MessageBubble({ msg }: { msg: Message }) {
   return (
     <>
       <div
-        className="max-w-[70%] px-4 py-2.5 rounded-2xl flex flex-col"
+        className="max-w-[85%] sm:max-w-[70%] px-4 py-2.5 rounded-2xl flex flex-col"
         style={{
           backgroundColor: msg.sender === "me" ? "var(--accent)" : "var(--bg-chat-bubble-other)",
           borderBottomRightRadius: msg.sender === "me" ? "6px" : "16px",
