@@ -1,5 +1,6 @@
 # 🔒 TempChat
 
+**Visit: https://temp-chat-lemon.vercel.app
 **Ephemeral, End-to-End Encrypted, Peer-to-Peer Communication.**
 
 TempChat is a privacy-first, open-source communication platform designed for the exchange of highly sensitive information. It serves as a secure, temporary bridge for sharing data that should never be permanently archived or monitored by third parties.
