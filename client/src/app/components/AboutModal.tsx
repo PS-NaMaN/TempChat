@@ -57,7 +57,8 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
                     <h3 className="uppercase tracking-widest text-xs font-bold">Purpose</h3>
                   </div>
                   <p className="text-[var(--text-primary)] leading-relaxed" style={{ fontSize: "14px" }}>
-                    TempChat is a specialized communication platform designed for the exchange of highly sensitive information.
+                    In this day and age, where you are tracked everywhere, there is no open source solution that you can use to communicate sensitive information.
+                    TempChat is a specialized open-source communication platform designed for the exchange of highly sensitive information.
                     It serves as a secure, ephemeral bridge for sharing data that should never be permanently archived or
                     monitored by third parties. Whether it is administrative credentials, personal identifiers, or sensitive
                     media, TempChat ensures the information exists only as long as the session.
@@ -96,19 +97,19 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-input)]">
                       <h4 className="text-[var(--text-main)] text-sm font-semibold mb-1">AES-GCM 256-bit</h4>
-                      <p className="text-[var(--text-faint)] text-xs leading-relaxed">Industry-standard authenticated encryption ensures message confidentiality and integrity.</p>
+                      <p className="text-[var(--text-secondary)] text-xs leading-relaxed">Industry-standard authenticated encryption ensures message confidentiality and integrity.</p>
                     </div>
                     <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-input)]">
                       <h4 className="text-[var(--text-main)] text-sm font-semibold mb-1">ECDH (P-256)</h4>
-                      <p className="text-[var(--text-faint)] text-xs leading-relaxed">Elliptic Curve Diffie-Hellman provides Perfect Forward Secrecy for every unique session.</p>
+                      <p className="text-[var(--text-secondary)] text-xs leading-relaxed">Elliptic Curve Diffie-Hellman provides Perfect Forward Secrecy for every unique session.</p>
                     </div>
                     <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-input)]">
                       <h4 className="text-[var(--text-main)] text-sm font-semibold mb-1">WebRTC (P2P)</h4>
-                      <p className="text-[var(--text-faint)] text-xs leading-relaxed">Data flows directly between peers. Messages never pass through the server's application layer.</p>
+                      <p className="text-[var(--text-secondary)] text-xs leading-relaxed">Data flows directly between peers. Messages never pass through the server's application layer.</p>
                     </div>
                     <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-input)]">
                       <h4 className="text-[var(--text-main)] text-sm font-semibold mb-1">Argon2 Hashing</h4>
-                      <p className="text-[var(--text-faint)] text-xs leading-relaxed">Room passwords are protected by memory-hard Argon2 hashing, resistant to GPU-based attacks.</p>
+                      <p className="text-[var(--text-secondary)] text-xs leading-relaxed">Room passwords are protected by memory-hard Argon2 hashing, resistant to GPU-based attacks.</p>
                     </div>
                   </div>
                 </section>
