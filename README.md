@@ -81,12 +81,6 @@ Open `http://localhost:5173` in two different browser windows to start testing.
 
 ---
 
-## 📸 Screenshots
-
-*(Add your screenshots here to show off that beautiful UI!)*
-
----
-
 ## 🤝 Contributing
 
 TempChat is an open-source project. Contributions, bug reports, and feature requests are welcome!
