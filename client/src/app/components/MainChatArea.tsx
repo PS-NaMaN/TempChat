@@ -1,21 +1,30 @@
 import { useState, useRef } from "react";
-import { Lock, Shield, Send, Download, Trash2, Clock, ImagePlus, X, Menu } from "lucide-react";
+import { Lock, Shield, Send, Download, Trash2, Clock, ImagePlus, X, Menu, FileText, Music, Play } from "lucide-react";
 
 interface Message {
   id: string;
   text: string;
   image?: string;
   imageBase64?: string;
+  video?: string;
+  videoBase64?: string;
+  audio?: string;
+  audioBase64?: string;
+  pdf?: string;
+  pdfBase64?: string;
+  fileName?: string;
+  fileSize?: string;
   sender: "me" | "other";
   time: string;
   pending?: boolean;
+  progress?: number;
 }
 
 interface MainChatAreaProps {
   activeRoomCode: string | null;
   messages: Message[];
   onSendMessage: (text: string) => void;
-  onSendImage?: (file: File) => void;
+  onSendFile?: (file: File) => void;
   onClearChat: () => void;
   onExportChat: () => void;
   connectionStatus: string;
@@ -27,7 +36,7 @@ export function MainChatArea({
   activeRoomCode,
   messages,
   onSendMessage,
-  onSendImage,
+  onSendFile,
   onClearChat,
   onExportChat,
   connectionStatus,
@@ -53,10 +62,11 @@ export function MainChatArea({
     }
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.type.startsWith('image/') && onSendImage) {
-      onSendImage(file);
+    const allowedTypes = ['image/', 'video/', 'audio/', 'application/pdf'];
+    if (file && allowedTypes.some(type => file.type.startsWith(type) || file.type === type) && onSendFile) {
+      onSendFile(file);
     }
     // Reset the file input so the same file can be selected again
     if (fileInputRef.current) {
@@ -67,7 +77,7 @@ export function MainChatArea({
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (onSendImage) {
+    if (onSendFile) {
       dragCounter.current++;
       if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
         setIsDragging(true);
@@ -78,7 +88,7 @@ export function MainChatArea({
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (onSendImage) {
+    if (onSendFile) {
       dragCounter.current--;
       if (dragCounter.current === 0) {
         setIsDragging(false);
@@ -97,25 +107,26 @@ export function MainChatArea({
     setIsDragging(false);
     dragCounter.current = 0;
 
-    if (onSendImage && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    if (onSendFile && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
-      if (file.type.startsWith('image/')) {
-        onSendImage(file);
+      const allowedTypes = ['image/', 'video/', 'audio/', 'application/pdf'];
+      if (allowedTypes.some(type => file.type.startsWith(type) || file.type === type)) {
+        onSendFile(file);
       }
     }
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
-    if (!onSendImage || !activeRoomCode) return;
+    if (!onSendFile || !activeRoomCode) return;
 
     const items = e.clipboardData?.items;
     if (items) {
       for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf("image") !== -1) {
+        const type = items[i].type;
+        if (type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/") || type === "application/pdf") {
           const file = items[i].getAsFile();
           if (file) {
-            onSendImage(file);
-            // Prevent pasting the image as text if the clipboard also has text/html
+            onSendFile(file);
             e.preventDefault();
           }
         }
@@ -134,14 +145,14 @@ export function MainChatArea({
       onPaste={handlePaste}
     >
       {/* Drag and Drop Overlay */}
-      {isDragging && onSendImage && (
+      {isDragging && onSendFile && (
         <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md transition-all duration-300">
           <div className="flex flex-col items-center gap-4 p-8 rounded-3xl border-2 border-dashed border-[var(--accent)] bg-black/60 shadow-2xl scale-110 transform transition-transform duration-300">
             <div className="p-5 rounded-full bg-[var(--accent)] text-white shadow-lg animate-bounce">
               <ImagePlus className="w-10 h-10" />
             </div>
             <div className="flex flex-col items-center gap-1">
-              <h3 className="text-xl font-bold text-white">Drop image to send</h3>
+              <h3 className="text-xl font-bold text-white">Drop file to send</h3>
               <p className="text-white/60 text-sm">Release to share in the room</p>
             </div>
           </div>
@@ -288,14 +299,14 @@ export function MainChatArea({
 
       {/* Message Input */}
       <div className="px-3 sm:px-5 pb-5 pt-2">
-        {onSendImage && (
+        {onSendFile && (
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
-            onChange={handleImageSelect}
+            accept="image/*,video/*,audio/*,.pdf"
+            onChange={handleFileSelect}
             className="hidden"
-            id="image-upload-input"
+            id="file-upload-input"
           />
         )}
         <div
@@ -314,13 +325,13 @@ export function MainChatArea({
             className="flex-1 bg-transparent text-[var(--text-main)] placeholder-[var(--text-dark)] outline-none disabled:cursor-not-allowed"
             style={{ fontSize: "14px", fontWeight: 400 }}
           />
-          {onSendImage && (
+          {onSendFile && (
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={!activeRoomCode}
               className="p-2 rounded-full transition-all duration-200 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center hover:bg-white/5"
-              title="Send Image"
-              id="image-upload-button"
+              title="Send File"
+              id="file-upload-button"
             >
               <ImagePlus className="w-4 h-4 text-[var(--text-faint)]" />
             </button>
@@ -347,25 +358,90 @@ function MessageBubble({ msg }: { msg: Message }) {
   const isLong = msg.text && msg.text.length > 500;
   const displayText = isLong && !expanded ? msg.text.slice(0, 500) + "..." : msg.text;
   const imageSrc = msg.image || msg.imageBase64;
+  const videoSrc = msg.video || msg.videoBase64;
+  const audioSrc = msg.audio || msg.audioBase64;
+  const pdfSrc = msg.pdf || msg.pdfBase64;
 
   return (
     <>
       <div
-        className="max-w-[85%] sm:max-w-[70%] px-4 py-2.5 rounded-2xl flex flex-col"
+        className="max-w-[85%] sm:max-w-[70%] px-4 py-2.5 rounded-2xl flex flex-col relative overflow-hidden"
         style={{
           backgroundColor: msg.sender === "me" ? "var(--accent)" : "var(--bg-chat-bubble-other)",
           borderBottomRightRadius: msg.sender === "me" ? "6px" : "16px",
           borderBottomLeftRadius: msg.sender === "other" ? "6px" : "16px",
         }}
       >
+        {msg.progress !== undefined && msg.progress < 100 && (
+          <div className="absolute top-0 left-0 w-full h-1 bg-black/20">
+            <div 
+              className="h-full bg-white/50 transition-all duration-300 ease-out" 
+              style={{ width: `${msg.progress}%` }} 
+            />
+          </div>
+        )}
+
         {imageSrc && (
           <img
             src={imageSrc}
             alt="Shared image"
-            className="rounded-xl mb-1.5 cursor-pointer hover:opacity-90 transition-opacity"
+            className="rounded-xl mb-1.5 cursor-pointer hover:opacity-90 transition-opacity mt-1"
             style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'cover' }}
             onClick={() => setShowModal(true)}
           />
+        )}
+
+        {videoSrc && (
+          <video
+            src={videoSrc}
+            controls
+            preload="metadata"
+            className="rounded-xl mb-1.5 mt-1"
+            style={{ maxWidth: '100%', maxHeight: '300px' }}
+          />
+        )}
+
+        {audioSrc && (
+          <div className="flex flex-col gap-2 mt-1 mb-1.5 min-w-[200px] sm:min-w-[280px]">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-black/10 border border-white/5">
+              <div className="p-2.5 rounded-full bg-[var(--accent)] text-white shadow-sm">
+                <Music className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-[13px] font-medium text-white truncate" title={msg.fileName || "Audio file"}>
+                  {msg.fileName || "Audio file"}
+                </span>
+                <span className="text-[10px] text-white/60">
+                  {msg.fileSize || "Shared Audio"}
+                </span>
+              </div>
+            </div>
+            <audio src={audioSrc} controls className="w-full h-8 custom-audio-player" />
+          </div>
+        )}
+
+        {pdfSrc && (
+          <div className="flex flex-col gap-2 mt-1 mb-1.5 min-w-[200px] sm:min-w-[240px]">
+            <a
+              href={pdfSrc}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 p-3 rounded-xl bg-black/10 border border-white/5 hover:bg-black/20 transition-all group"
+            >
+              <div className="p-2.5 rounded-full bg-red-500/80 text-white shadow-sm group-hover:scale-110 transition-transform">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col overflow-hidden flex-1">
+                <span className="text-[13px] font-medium text-white truncate" title={msg.fileName || "Document.pdf"}>
+                  {msg.fileName || "Document.pdf"}
+                </span>
+                <span className="text-[10px] text-white/60">
+                  {msg.fileSize || "PDF Document"}
+                </span>
+              </div>
+              <Download className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
+            </a>
+          </div>
         )}
 
         {displayText && (

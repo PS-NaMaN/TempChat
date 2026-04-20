@@ -45,7 +45,7 @@ function Dashboard() {
 
     const {
         messages, addMessage, setMessages, clearChat,
-        connectionStatus, fingerprint, setRoomId, sharedKey
+        connectionStatus, fingerprint, setRoomId, sharedKey, updateMessage
     } = useChatStore();
 
     const {
@@ -153,13 +153,13 @@ function Dashboard() {
         }
     }, [roomId, addMessage, saveEncryptedMessage]);
 
-    const handleImageReceived = useCallback(async (imageData) => {
+    const handleFileReceived = useCallback(async (fileData) => {
         const currentSharedKey = useChatStore.getState().sharedKey;
         if (!currentSharedKey) return;
 
         try {
-            const decryptedBuffer = await decryptBinary(currentSharedKey, imageData.iv, imageData.ciphertext);
-            const blob = new Blob([decryptedBuffer], { type: imageData.fileType });
+            const decryptedBuffer = await decryptBinary(currentSharedKey, fileData.iv, fileData.ciphertext);
+            const blob = new Blob([decryptedBuffer], { type: fileData.fileType });
             const blobUrl = URL.createObjectURL(blob);
 
             const base64 = await new Promise((resolve) => {
@@ -168,23 +168,66 @@ function Dashboard() {
                 reader.readAsDataURL(blob);
             });
 
+            const isImage = fileData.fileType.startsWith('image/');
+            const isVideo = fileData.fileType.startsWith('video/');
+            const isAudio = fileData.fileType.startsWith('audio/');
+            const isPdf = fileData.fileType === 'application/pdf';
+
             const newMsg = {
-                id: imageData.msgId,
+                id: fileData.msgId,
                 text: '',
-                image: blobUrl,
-                imageBase64: base64,
                 sender: 'other',
-                time: imageData.time
+                time: fileData.time,
+                progress: 100,
+                fileName: fileData.fileName
             };
 
+            if (isImage) {
+                newMsg.image = blobUrl;
+                newMsg.imageBase64 = base64;
+            } else if (isVideo) {
+                newMsg.video = blobUrl;
+                newMsg.videoBase64 = base64;
+            } else if (isAudio) {
+                newMsg.audio = blobUrl;
+                newMsg.audioBase64 = base64;
+            } else if (isPdf) {
+                newMsg.pdf = blobUrl;
+                newMsg.pdfBase64 = base64;
+            }
+
             addMessage(newMsg);
-            saveEncryptedMessage({ id: imageData.msgId, roomId, text: '', image: base64, time: imageData.time, sender: 'other' });
+            
+            const storageMsg = { 
+                id: fileData.msgId, 
+                roomId, 
+                text: '', 
+                time: fileData.time, 
+                sender: 'other',
+                fileName: fileData.fileName
+            };
+            if (isImage) storageMsg.image = base64;
+            if (isVideo) storageMsg.video = base64;
+            if (isAudio) storageMsg.audio = base64;
+            if (isPdf) storageMsg.pdf = base64;
+
+            saveEncryptedMessage(storageMsg);
         } catch (e) {
-            console.error("Failed to decrypt incoming image", e);
+            console.error("Failed to decrypt incoming file", e);
         }
     }, [roomId, addMessage, saveEncryptedMessage]);
 
-    const { sendMessage, sendImageChunks } = useWebRTC(isJoined ? roomId : null, password, handleDecryptedMessage, handleImageReceived);
+    const handleFileProgress = useCallback((msgId, progress) => {
+        updateMessage(msgId, { progress });
+    }, [updateMessage]);
+
+    const { sendMessage, sendFileChunks } = useWebRTC(
+        isJoined ? roomId : null, 
+        password, 
+        handleDecryptedMessage, 
+        handleFileReceived, 
+        handleFileProgress
+    );
 
     // Storage interactions (restoring messages upon loading a room)
     useEffect(() => {
@@ -208,7 +251,39 @@ function Dashboard() {
                                 text: msg.text || '',
                                 image: msg.image,
                                 sender: msg.sender || 'me',
-                                time: msg.time || ''
+                                time: msg.time || '',
+                                progress: 100,
+                                fileName: msg.fileName
+                            });
+                        } else if (msg.video) {
+                            restoredMsgs.push({
+                                id: msg.id,
+                                text: msg.text || '',
+                                video: msg.video,
+                                sender: msg.sender || 'me',
+                                time: msg.time || '',
+                                progress: 100,
+                                fileName: msg.fileName
+                            });
+                        } else if (msg.audio) {
+                            restoredMsgs.push({
+                                id: msg.id,
+                                text: msg.text || '',
+                                audio: msg.audio,
+                                sender: msg.sender || 'me',
+                                time: msg.time || '',
+                                progress: 100,
+                                fileName: msg.fileName
+                            });
+                        } else if (msg.pdf) {
+                            restoredMsgs.push({
+                                id: msg.id,
+                                text: msg.text || '',
+                                pdf: msg.pdf,
+                                sender: msg.sender || 'me',
+                                time: msg.time || '',
+                                progress: 100,
+                                fileName: msg.fileName
                             });
                         } else if (msg.text) {
                             restoredMsgs.push({
@@ -374,14 +449,26 @@ function Dashboard() {
         }
     };
 
-    const handleSendImage = async (file) => {
+    const formatFileSize = (bytes) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    };
+
+    const handleSendFile = async (file) => {
         const currentSharedKey = useChatStore.getState().sharedKey;
         if (!currentSharedKey || !file) return;
+
+        if (file.size > 100 * 1024 * 1024) {
+            alert("Warning: Files larger than 100MB are stored in IndexedDB and may take up significant space in your browser's local cache.");
+        }
 
         const timestamp = Date.now();
         const timeStr = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const msgId = timestamp.toString();
-        const transferId = `img_${msgId}`;
+        const transferId = `file_${msgId}`;
 
         try {
             const arrayBuffer = await file.arrayBuffer();
@@ -395,28 +482,64 @@ function Dashboard() {
                 reader.readAsDataURL(file);
             });
 
-            const sent = await sendImageChunks(encrypted, {
+            const isImage = file.type.startsWith('image/');
+            const isVideo = file.type.startsWith('video/');
+            const isAudio = file.type.startsWith('audio/');
+            const isPdf = file.type === 'application/pdf';
+
+            const newMsg = {
+                id: msgId,
+                text: '',
+                sender: 'me',
+                time: timeStr,
+                progress: 0,
+                fileName: file.name,
+                fileSize: formatFileSize(file.size)
+            };
+
+            if (isImage) {
+                newMsg.image = blobUrl;
+                newMsg.imageBase64 = base64;
+            } else if (isVideo) {
+                newMsg.video = blobUrl;
+                newMsg.videoBase64 = base64;
+            } else if (isAudio) {
+                newMsg.audio = blobUrl;
+                newMsg.audioBase64 = base64;
+            } else if (isPdf) {
+                newMsg.pdf = blobUrl;
+                newMsg.pdfBase64 = base64;
+            }
+
+            addMessage(newMsg);
+
+            const sent = await sendFileChunks(encrypted, {
                 transferId,
                 fileName: file.name,
                 fileType: file.type,
                 msgId,
                 time: timeStr
+            }, (progress) => {
+                updateMessage(msgId, { progress });
             });
 
             if (sent) {
-                const newMsg = {
-                    id: msgId,
-                    text: '',
-                    image: blobUrl,
-                    imageBase64: base64,
+                const storageMsg = { 
+                    id: msgId, 
+                    roomId, 
+                    text: '', 
+                    time: timeStr, 
                     sender: 'me',
-                    time: timeStr
+                    fileName: file.name
                 };
-                addMessage(newMsg);
-                saveEncryptedMessage({ id: msgId, roomId, text: '', image: base64, time: timeStr, sender: 'me' });
+                if (isImage) storageMsg.image = base64;
+                if (isVideo) storageMsg.video = base64;
+                if (isAudio) storageMsg.audio = base64;
+                if (isPdf) storageMsg.pdf = base64;
+                saveEncryptedMessage(storageMsg);
             }
         } catch (e) {
-            console.error("Failed to send image", e);
+            console.error("Failed to send file", e);
         }
     };
 
@@ -486,7 +609,7 @@ function Dashboard() {
                 activeRoomCode={roomId || null}
                 messages={messages}
                 onSendMessage={handleNewMessage}
-                onSendImage={handleSendImage}
+                onSendFile={handleSendFile}
                 onClearChat={handleClearCurrentChat}
                 onExportChat={handleExportChat}
                 connectionStatus={connectionStatus}

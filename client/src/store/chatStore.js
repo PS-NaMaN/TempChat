@@ -19,4 +19,7 @@ export const useChatStore = create((set) => ({
     markMessageSent: (id) => set((state) => ({
         messages: state.messages.map(m => m.id === id ? { ...m, pending: false } : m)
     })),
+    updateMessage: (id, updates) => set((state) => ({
+        messages: state.messages.map(m => m.id === id ? { ...m, ...updates } : m)
+    })),
 }));
