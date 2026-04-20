@@ -105,6 +105,24 @@ export function MainChatArea({
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    if (!onSendImage || !activeRoomCode) return;
+
+    const items = e.clipboardData?.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            onSendImage(file);
+            // Prevent pasting the image as text if the clipboard also has text/html
+            e.preventDefault();
+          }
+        }
+      }
+    }
+  };
+
   return (
     <div
       className="flex-1 flex flex-col h-full transition-colors duration-200 relative"
@@ -113,6 +131,7 @@ export function MainChatArea({
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
+      onPaste={handlePaste}
     >
       {/* Drag and Drop Overlay */}
       {isDragging && onSendImage && (
