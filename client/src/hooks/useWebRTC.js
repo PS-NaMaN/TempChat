@@ -38,13 +38,14 @@ function buildIceConfig(stunIndex = 0) {
     return { iceServers: servers };
 }
 
-const IMAGE_CHUNK_SIZE = 16 * 1024; // 16KB chunks
+const FILE_CHUNK_SIZE = 64 * 1024; // 64KB binary chunks
 
 export function useWebRTC(roomId, password, onMessageDecrypted, onFileReceived, onFileProgress) {
     const socketRef = useRef(null);
     const pcRef = useRef(null);
     const dcRef = useRef(null);
     const fileBufferRef = useRef({});
+    const activeTransferIdRef = useRef(null); // tracks which transfer incoming binary belongs to
 
     // Store callbacks in refs to avoid re-creating setupDataChannel/initWebRTC
     // when the callbacks change, which would tear down the entire WebRTC connection.
@@ -66,6 +67,8 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onFileReceived, 
 
     const setupDataChannel = useCallback((dc) => {
         dcRef.current = dc;
+        dc.binaryType = 'arraybuffer';
+
         dc.onopen = async () => {
             setConnectionStatus('connected');
 
@@ -80,6 +83,54 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onFileReceived, 
 
         dc.onmessage = async (event) => {
             try {
+                // Binary message = file chunk (ArrayBuffer)
+                if (event.data instanceof ArrayBuffer) {
+                    const transferId = activeTransferIdRef.current;
+                    if (!transferId) return;
+
+                    const buf = fileBufferRef.current[transferId];
+                    if (!buf) return;
+
+                    const dataView = new DataView(event.data, 0, 4);
+                    const chunkIndex = dataView.getUint32(0);
+                    const chunkData = new Uint8Array(event.data, 4);
+
+                    buf.chunks[chunkIndex] = chunkData;
+                    const received = buf.chunks.filter(Boolean).length;
+
+                    if (onFileProgressRef.current) {
+                        const progress = Math.round((received / buf.totalChunks) * 100);
+                        onFileProgressRef.current(buf.msgId, progress);
+                    }
+
+                    if (received === buf.totalChunks) {
+                        // Concatenate all Uint8Array chunks into one
+                        let totalLen = 0;
+                        for (const c of buf.chunks) totalLen += c.byteLength;
+                        const fullArray = new Uint8Array(totalLen);
+                        let offset = 0;
+                        for (const c of buf.chunks) {
+                            fullArray.set(c, offset);
+                            offset += c.byteLength;
+                        }
+
+                        if (onFileReceivedRef.current) {
+                            onFileReceivedRef.current({
+                                iv: buf.iv,
+                                ciphertext: fullArray,
+                                fileName: buf.fileName,
+                                fileType: buf.fileType,
+                                msgId: buf.msgId,
+                                time: buf.time
+                            });
+                        }
+                        delete fileBufferRef.current[transferId];
+                        activeTransferIdRef.current = null;
+                    }
+                    return;
+                }
+
+                // Text message = JSON (key-exchange, chat-message, file-start)
                 const payload = JSON.parse(event.data);
 
                 if (payload.type === 'key-exchange') {
@@ -106,6 +157,7 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onFileReceived, 
                     }
                 } else if (payload.type === 'file-start') {
                     // Start buffering a new incoming file
+                    activeTransferIdRef.current = payload.transferId;
                     fileBufferRef.current[payload.transferId] = {
                         totalChunks: payload.totalChunks,
                         fileName: payload.fileName,
@@ -113,38 +165,10 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onFileReceived, 
                         iv: payload.iv,
                         msgId: payload.msgId,
                         time: payload.time,
-                        chunks: []
+                        chunks: new Array(payload.totalChunks)
                     };
                     if (onFileProgressRef.current) {
                         onFileProgressRef.current(payload.msgId, 0);
-                    }
-                } else if (payload.type === 'file-chunk') {
-                    const buf = fileBufferRef.current[payload.transferId];
-                    if (buf) {
-                        buf.chunks[payload.index] = payload.data;
-                        // Check if all chunks received
-                        const received = buf.chunks.filter(Boolean).length;
-                        
-                        if (onFileProgressRef.current) {
-                            const progress = Math.round((received / buf.totalChunks) * 100);
-                            onFileProgressRef.current(buf.msgId, progress);
-                        }
-
-                        if (received === buf.totalChunks) {
-                            // Reconstruct the full encrypted array
-                            const fullArray = buf.chunks.flat();
-                            if (onFileReceivedRef.current) {
-                                onFileReceivedRef.current({
-                                    iv: buf.iv,
-                                    ciphertext: fullArray,
-                                    fileName: buf.fileName,
-                                    fileType: buf.fileType,
-                                    msgId: buf.msgId,
-                                    time: buf.time
-                                });
-                            }
-                            delete fileBufferRef.current[payload.transferId];
-                        }
                     }
                 }
             } catch (e) {
@@ -346,63 +370,63 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onFileReceived, 
     };
 
     const sendFileChunks = async (encryptedData, meta, onProgress) => {
-        // encryptedData: { iv, ciphertext (number[]) }
+        // encryptedData: { iv: Uint8Array, ciphertext: Uint8Array }
         // meta: { transferId, fileName, fileType, msgId, time }
         if (dcRef.current?.readyState !== 'open') return false;
 
-        const cipherArray = encryptedData.ciphertext;
-        const totalChunks = Math.ceil(cipherArray.length / IMAGE_CHUNK_SIZE);
+        const cipherBytes = encryptedData.ciphertext; // Uint8Array
+        const totalChunks = Math.ceil(cipherBytes.byteLength / FILE_CHUNK_SIZE);
 
         if (onProgress) onProgress(0);
 
         try {
-            // Send start message
+            // Send file-start as JSON with metadata + IV
             dcRef.current.send(JSON.stringify({
                 type: 'file-start',
                 transferId: meta.transferId,
                 totalChunks,
                 fileName: meta.fileName,
                 fileType: meta.fileType,
-                iv: encryptedData.iv,
+                iv: Array.from(encryptedData.iv),
                 msgId: meta.msgId,
                 time: meta.time
             }));
         } catch (e) {
-            console.error("Failed to send file start message", e);
+            console.error("Failed to send file-start message", e);
             return false;
         }
 
         // Set bufferedAmountLowThreshold if supported
         if ('bufferedAmountLowThreshold' in dcRef.current) {
-            dcRef.current.bufferedAmountLowThreshold = 500 * 1024; // 500KB
+            dcRef.current.bufferedAmountLowThreshold = 256 * 1024;
         }
 
-        // Send chunks
+        // Send each chunk as raw binary: [4-byte big-endian chunk index][chunk data]
         for (let i = 0; i < totalChunks; i++) {
             if (dcRef.current?.readyState !== 'open') return false;
 
             // Backpressure: pause if buffer is too full
-            if (dcRef.current.bufferedAmount > 1024 * 1024) { // 1MB buffer limit
+            if (dcRef.current.bufferedAmount > 1024 * 1024) {
                 await new Promise(resolve => {
-                    const onBufferedAmountLow = () => {
-                        dcRef.current.removeEventListener('bufferedamountlow', onBufferedAmountLow);
+                    const onLow = () => {
+                        dcRef.current.removeEventListener('bufferedamountlow', onLow);
                         resolve();
                     };
-                    dcRef.current.addEventListener('bufferedamountlow', onBufferedAmountLow);
+                    dcRef.current.addEventListener('bufferedamountlow', onLow);
                 });
             }
 
             try {
-                const start = i * IMAGE_CHUNK_SIZE;
-                const end = Math.min(start + IMAGE_CHUNK_SIZE, cipherArray.length);
-                const chunk = cipherArray.slice(start, end);
+                const start = i * FILE_CHUNK_SIZE;
+                const end = Math.min(start + FILE_CHUNK_SIZE, cipherBytes.byteLength);
+                const chunkData = cipherBytes.subarray(start, end);
 
-                dcRef.current.send(JSON.stringify({
-                    type: 'file-chunk',
-                    transferId: meta.transferId,
-                    index: i,
-                    data: chunk
-                }));
+                // Prepend 4-byte chunk index header
+                const packet = new ArrayBuffer(4 + chunkData.byteLength);
+                new DataView(packet).setUint32(0, i);
+                new Uint8Array(packet, 4).set(chunkData);
+
+                dcRef.current.send(packet);
             } catch (e) {
                 console.error("Failed to send file chunk", e);
                 return false;
@@ -413,8 +437,10 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onFileReceived, 
                 onProgress(progress);
             }
 
-            // Yield to main thread briefly to maintain UI responsiveness
-            await new Promise(r => setTimeout(r, 0));
+            // Yield to main thread
+            if (i % 10 === 9) {
+                await new Promise(r => setTimeout(r, 0));
+            }
         }
 
         return true;

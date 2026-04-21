@@ -57,7 +57,7 @@ export const encryptBinary = async (sharedKey, arrayBuffer) => {
         sharedKey,
         arrayBuffer
     );
-    return { iv: Array.from(iv), ciphertext: Array.from(new Uint8Array(ciphertextBuffer)) };
+    return { iv: new Uint8Array(iv), ciphertext: new Uint8Array(ciphertextBuffer) };
 };
 
 export const decryptBinary = async (sharedKey, ivArray, ciphertextArray) => {
