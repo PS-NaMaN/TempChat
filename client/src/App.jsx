@@ -459,7 +459,12 @@ function Dashboard() {
 
     const handleSendFile = async (file) => {
         const currentSharedKey = useChatStore.getState().sharedKey;
-        if (!currentSharedKey || !file) return;
+        const currentStatus = useChatStore.getState().connectionStatus;
+        if (!file) return;
+        
+        // When not encrypted, wait until it is encrypted to encrypt the file, 
+        // since we might not have currentSharedKey yet
+        if (!currentSharedKey && currentStatus === 'encrypted') return;
 
         if (file.size > 100 * 1024 * 1024) {
             alert("Warning: Files larger than 100MB are stored in IndexedDB and may take up significant space in your browser's local cache.");
@@ -471,9 +476,6 @@ function Dashboard() {
         const transferId = `file_${msgId}`;
 
         try {
-            const arrayBuffer = await file.arrayBuffer();
-            const encrypted = await encryptBinary(currentSharedKey, arrayBuffer);
-
             const blobUrl = URL.createObjectURL(file);
 
             const base64 = await new Promise((resolve) => {
@@ -492,9 +494,10 @@ function Dashboard() {
                 text: '',
                 sender: 'me',
                 time: timeStr,
-                progress: 0,
+                progress: currentStatus === 'encrypted' ? 0 : undefined,
                 fileName: file.name,
-                fileSize: formatFileSize(file.size)
+                fileSize: formatFileSize(file.size),
+                pending: currentStatus !== 'encrypted'
             };
 
             if (isImage) {
@@ -513,33 +516,60 @@ function Dashboard() {
 
             addMessage(newMsg);
 
-            const sent = await sendFileChunks(encrypted, {
-                transferId,
-                fileName: file.name,
-                fileType: file.type,
-                msgId,
-                time: timeStr
-            }, (progress) => {
-                updateMessage(msgId, { progress });
-            });
+            if (currentStatus === 'encrypted') {
+                const arrayBuffer = await file.arrayBuffer();
+                const encrypted = await encryptBinary(currentSharedKey, arrayBuffer);
 
-            if (sent) {
-                const storageMsg = { 
-                    id: msgId, 
-                    roomId, 
-                    text: '', 
-                    time: timeStr, 
-                    sender: 'me',
-                    fileName: file.name
+                const sent = await sendFileChunks(encrypted, {
+                    transferId,
+                    fileName: file.name,
+                    fileType: file.type,
+                    msgId,
+                    time: timeStr
+                }, (progress) => {
+                    updateMessage(msgId, { progress });
+                });
+
+                if (sent) {
+                    const storageMsg = { 
+                        id: msgId, 
+                        roomId, 
+                        text: '', 
+                        time: timeStr, 
+                        sender: 'me',
+                        fileName: file.name
+                    };
+                    if (isImage) storageMsg.image = base64;
+                    if (isVideo) storageMsg.video = base64;
+                    if (isAudio) storageMsg.audio = base64;
+                    if (isPdf) storageMsg.pdf = base64;
+                    saveEncryptedMessage(storageMsg);
+                } else {
+                    updateMessage(msgId, { progress: 100, error: 'Failed to send file' });
+                    alert(`Failed to send file: ${file.name}`);
+                }
+            } else {
+                // Queue the file to send later
+                // Storing the base64 representing the file as "plainPayload"
+                // since we encrypt when the connection is live.
+                const pendingData = {
+                    base64Data: base64, // to reconstruct file
+                    fileName: file.name,
+                    fileType: file.type,
+                    fileSize: file.size,
+                    type: 'file'
                 };
-                if (isImage) storageMsg.image = base64;
-                if (isVideo) storageMsg.video = base64;
-                if (isAudio) storageMsg.audio = base64;
-                if (isPdf) storageMsg.pdf = base64;
-                saveEncryptedMessage(storageMsg);
+                
+                await savePendingMessage({
+                    id: msgId,
+                    roomId,
+                    plainPayload: pendingData,
+                    displayMsg: newMsg
+                });
             }
         } catch (e) {
-            console.error("Failed to send file", e);
+            console.error("Failed to process/send file", e);
+            alert(`Error handling file: ${file.name}`);
         }
     };
 

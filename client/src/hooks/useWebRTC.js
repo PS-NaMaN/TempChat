@@ -355,40 +355,66 @@ export function useWebRTC(roomId, password, onMessageDecrypted, onFileReceived, 
 
         if (onProgress) onProgress(0);
 
-        // Send start message
-        dcRef.current.send(JSON.stringify({
-            type: 'file-start',
-            transferId: meta.transferId,
-            totalChunks,
-            fileName: meta.fileName,
-            fileType: meta.fileType,
-            iv: encryptedData.iv,
-            msgId: meta.msgId,
-            time: meta.time
-        }));
+        try {
+            // Send start message
+            dcRef.current.send(JSON.stringify({
+                type: 'file-start',
+                transferId: meta.transferId,
+                totalChunks,
+                fileName: meta.fileName,
+                fileType: meta.fileType,
+                iv: encryptedData.iv,
+                msgId: meta.msgId,
+                time: meta.time
+            }));
+        } catch (e) {
+            console.error("Failed to send file start message", e);
+            return false;
+        }
+
+        // Set bufferedAmountLowThreshold if supported
+        if ('bufferedAmountLowThreshold' in dcRef.current) {
+            dcRef.current.bufferedAmountLowThreshold = 500 * 1024; // 500KB
+        }
 
         // Send chunks
         for (let i = 0; i < totalChunks; i++) {
-            const start = i * IMAGE_CHUNK_SIZE;
-            const end = Math.min(start + IMAGE_CHUNK_SIZE, cipherArray.length);
-            const chunk = cipherArray.slice(start, end);
+            if (dcRef.current?.readyState !== 'open') return false;
 
-            dcRef.current.send(JSON.stringify({
-                type: 'file-chunk',
-                transferId: meta.transferId,
-                index: i,
-                data: chunk
-            }));
+            // Backpressure: pause if buffer is too full
+            if (dcRef.current.bufferedAmount > 1024 * 1024) { // 1MB buffer limit
+                await new Promise(resolve => {
+                    const onBufferedAmountLow = () => {
+                        dcRef.current.removeEventListener('bufferedamountlow', onBufferedAmountLow);
+                        resolve();
+                    };
+                    dcRef.current.addEventListener('bufferedamountlow', onBufferedAmountLow);
+                });
+            }
+
+            try {
+                const start = i * IMAGE_CHUNK_SIZE;
+                const end = Math.min(start + IMAGE_CHUNK_SIZE, cipherArray.length);
+                const chunk = cipherArray.slice(start, end);
+
+                dcRef.current.send(JSON.stringify({
+                    type: 'file-chunk',
+                    transferId: meta.transferId,
+                    index: i,
+                    data: chunk
+                }));
+            } catch (e) {
+                console.error("Failed to send file chunk", e);
+                return false;
+            }
 
             if (onProgress) {
                 const progress = Math.round(((i + 1) / totalChunks) * 100);
                 onProgress(progress);
             }
 
-            // Small delay between chunks to avoid overwhelming the channel
-            if (i < totalChunks - 1) {
-                await new Promise(r => setTimeout(r, 5));
-            }
+            // Yield to main thread briefly to maintain UI responsiveness
+            await new Promise(r => setTimeout(r, 0));
         }
 
         return true;
