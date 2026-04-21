@@ -465,7 +465,12 @@ function MessageBubble({ msg }: { msg: Message }) {
         <div
           className={`mt-1 flex items-center gap-1 ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
         >
-          {msg.pending && (
+          {msg.error && (
+            <span className="flex items-center gap-0.5 text-red-300">
+              <span style={{ fontSize: "9px" }} title={msg.error}>Failed</span>
+            </span>
+          )}
+          {msg.pending && !msg.error && (
             <span className="flex items-center gap-0.5 text-white/40">
               <Clock className="w-3 h-3" />
               <span style={{ fontSize: "9px" }}>Queued</span>
