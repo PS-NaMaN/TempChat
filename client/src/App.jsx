@@ -346,22 +346,74 @@ function Dashboard() {
                 }
 
                 try {
-                    const encResult = await sendMessage(item.plainPayload);
-                    if (encResult) {
-                        await saveEncryptedMessage({
-                            id: item.id,
-                            roomId,
-                            text: JSON.parse(item.plainPayload).text,
-                            time: JSON.parse(item.plainPayload).time,
-                            sender: 'me'
+                    const currentSharedKey = useChatStore.getState().sharedKey;
+
+                    if (item.plainPayload && typeof item.plainPayload === 'object' && item.plainPayload.type === 'file') {
+                        // Handled pending file
+                        const dataUrl = item.plainPayload.base64Data;
+                        const res = await fetch(dataUrl);
+                        const arrayBuffer = await res.arrayBuffer();
+                        const encrypted = await encryptBinary(currentSharedKey, arrayBuffer);
+                        
+                        const transferId = `file_${item.id}`;
+                        const sent = await sendFileChunks(encrypted, {
+                            transferId,
+                            fileName: item.plainPayload.fileName,
+                            fileType: item.plainPayload.fileType,
+                            msgId: item.id,
+                            time: item.displayMsg?.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        }, (progress) => {
+                            updateMessage(item.id, { progress });
                         });
-                        await deletePendingMessage(item.id);
-                        // Update UI to remove 'Queued' tag
-                        useChatStore.getState().markMessageSent(item.id);
-                        console.log(`[Queue] Sent queued message ${item.id}`);
+
+                        if (sent) {
+                            const isImage = item.plainPayload.fileType.startsWith('image/');
+                            const isVideo = item.plainPayload.fileType.startsWith('video/');
+                            const isAudio = item.plainPayload.fileType.startsWith('audio/');
+                            const isPdf = item.plainPayload.fileType === 'application/pdf';
+
+                            const storageMsg = { 
+                                id: item.id, 
+                                roomId, 
+                                text: '', 
+                                time: item.displayMsg?.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+                                sender: 'me',
+                                fileName: item.plainPayload.fileName
+                            };
+                            if (isImage) storageMsg.image = dataUrl;
+                            if (isVideo) storageMsg.video = dataUrl;
+                            if (isAudio) storageMsg.audio = dataUrl;
+                            if (isPdf) storageMsg.pdf = dataUrl;
+
+                            await saveEncryptedMessage(storageMsg);
+                            await deletePendingMessage(item.id);
+                            useChatStore.getState().markMessageSent(item.id);
+                            // Clear progress since it is sent
+                            updateMessage(item.id, { progress: 100 });
+                            console.log(`[Queue] Sent queued file ${item.id}`);
+                        } else {
+                            updateMessage(item.id, { progress: 100, error: 'Failed to send file' });
+                            console.log(`[Queue] Failed to send queued file ${item.id}`);
+                        }
+                    } else {
+                        // Regular text message
+                        const encResult = await sendMessage(item.plainPayload);
+                        if (encResult) {
+                            await saveEncryptedMessage({
+                                id: item.id,
+                                roomId,
+                                text: JSON.parse(item.plainPayload).text,
+                                time: JSON.parse(item.plainPayload).time,
+                                sender: 'me'
+                            });
+                            await deletePendingMessage(item.id);
+                            // Update UI to remove 'Queued' tag
+                            useChatStore.getState().markMessageSent(item.id);
+                            console.log(`[Queue] Sent queued message ${item.id}`);
+                        }
                     }
                 } catch (e) {
-                    console.error('[Queue] Failed to send queued message', item.id, e);
+                    console.error('[Queue] Failed to send queued message/file', item.id, e);
                 }
 
                 // Rate-limit: wait 200ms between each send
